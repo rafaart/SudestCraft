@@ -1,4 +1,34 @@
 import os
+import ifcopenshell.geom
+
+class Ifc():
+    config = {
+        'FAM CONSTRUCOES':{
+            'geometry_settings': None,
+            'params': {
+                'tag': ('Tekla Assembly', 'Assembly/Cast unit Mark'),
+                'cwp': ('Default', 'USER_FIELD_1'),
+                'position_code': ('Tekla Assembly', 'Assembly/Cast unit position code')
+            }
+        },
+        'CODEME ENGENHARIA':{
+            'geometry_settings': None,
+            'params': {
+                'tag': ('Tekla Assembly', 'Assembly/Cast unit Mark'),
+                'cwp': ('Default', 'USER_FIELD_4'),
+                'position_code': ('Tekla Assembly', 'Assembly/Cast unit position code')
+            }
+        },
+        'SINOSTEEL':{
+            'geometry_settings': ifcopenshell.geom.settings(),
+            'params': {
+                'tag': ('Tekla Assembly', 'Assembly/Cast unit Mark'),
+                'cwp': ('Default', 'USER_FIELD_1'),
+                'position_code': ('Tekla Assembly', 'Assembly/Cast unit position code')
+            }
+        }
+    }
+
 
 class Project():
     REPOSITORY_BRANCH = r'\BI\02. Repositório de Arquivos'
@@ -25,8 +55,8 @@ class Project():
         self.OUTPUT_FAM = self.DASHBOARD_PATH + r'\Fornecimento\FAM Steel'
         self.OUTPUT_CODEME = self.DASHBOARD_PATH + r'\Fornecimento\Codeme'
         self.OUTPUT_SINOSTEEL = self.DASHBOARD_PATH + r'\Fornecimento\Sinosteel'
-        self.OUTPUT_MONTAGEM_ELETROMECANICA = self.DASHBOARD_PATH + r'\Fornecimento\FAM Steel'
-        self.OUTPUT_GESTAO_MATERIAIS = self.DASHBOARD_PATH + r'\Fornecimento\FAM Steel'
+        self.OUTPUT_MONTAGEM_ELETROMECANICA = self.DASHBOARD_PATH + r'\Montagem Eletromecanica'
+        self.OUTPUT_GESTAO_MATERIAIS = self.DASHBOARD_PATH + r'\Gestão de Materiais'
 
     def __repr__(self) -> str:
         return self.name

@@ -7,10 +7,10 @@ from materials import Reports
 from masterplan import ListaMaster, Masterplan
 
 
-def newsteel(output_dir):
+def newsteel():
     output_dir = os.environ['OUTPUT_MONTAGEM_ELETROMECANICA_NEWSTEEL']
-    reports = Reports(source_dir=os.environ['REPORTS_PATH_NEWSTEEL'])
-    summary = foundation.Summary(summary_dir=os.environ['SUMMARY_PATH_NEWSTEEL'])
+    reports = Reports(os.environ['REPORTS_PATH_NEWSTEEL'])
+    summary = foundation.Summary(os.environ['SUMMARY_PATH_NEWSTEEL'])
     masterplan = suppliers.CronogramaMasterConstrucap(os.environ['MONTADORA_PATH_NEWSTEEL'])
 
     df_summary = summary.get_report()
@@ -34,6 +34,7 @@ def newsteel(output_dir):
     df_iwp = pipeline_tools._predict_stock(df_iwp, df_unknow_iwp)
     df_iwp = Reports._get_quantities(df_iwp.sort_values(by='data_inicio', ascending=True), df_recebimento.copy())
     df_iwp.to_parquet(os.path.join(output_dir, 'iwp_data.parquet'), index=False)
+    df_iwp.to_csv(os.path.join(output_dir, 'iwp_data.csv'), index=False)
     
     df_cwp = pd.merge(
         left=df_desenho,
@@ -57,10 +58,11 @@ def newsteel(output_dir):
     df_cwp = pipeline_tools._predict_stock(df_cwp, df_unknow_cwp)
     df_cwp = Reports._get_quantities(df_cwp.sort_values(by='data_inicio', ascending=True), df_recebimento)
     df_cwp.to_parquet(os.path.join(output_dir, 'cwp_data.parquet'), index=False)
+    df_cwp.to_csv(os.path.join(output_dir, 'cwp_data.csv'), index=False)
 
 
-def montagem_eletromecanica_capanema():
-    output_dir = os.environ['OUTPUT_MONTAGEM_ELETROMECANICA_NEWSTEEL']
+def capanema():
+    output_dir = os.environ['OUTPUT_MONTAGEM_ELETROMECANICA_CAPANEMA']
     reports = Reports(source_dir=os.environ['REPORTS_PATH_CAPANEMA'])
     summary = foundation.Summary(os.environ['SUMMARY_PATH_CAPANEMA'])
     masterplan = Masterplan(os.environ['MASTERPLAN_PATH_CAPANEMA'])
@@ -87,9 +89,18 @@ def montagem_eletromecanica_capanema():
     df_unknow_iwp = df_unknow_iwp.groupby(by=['tag'], as_index=False).sum(numeric_only=True)
     df_iwp = pipeline_tools._predict_stock(df_iwp, df_unknow_iwp)
     df_iwp = Reports._get_quantities(df_iwp.sort_values(by='data_inicio', ascending=True), df_recebimento.copy())
+    df_iwp = pd.merge(
+        df_iwp,
+        df_recebimento[['tag', 'peso_un']],
+        on='tag',
+        how='left',
+        suffixes=('_desenho', '_recebimento')
+    )
+    df_iwp.loc[df_iwp['peso_un_recebimento'].isna(), 'peso_un'] = df_iwp['peso_un_desenho']
+    df_iwp.loc[df_iwp['peso_un'].isna(), 'peso_un'] = df_iwp['peso_un_recebimento']
     df_iwp.to_parquet(os.path.join(output_dir, 'iwp_data.parquet'), index=False)
+    df_iwp.to_csv(os.path.join(output_dir, 'iwp_data.csv'), index=False)
     
-
     df_cwp = pd.merge(
         left=df_desenho,
         right=df_summary[['cwp', 'data_inicio']].sort_values(by='data_inicio', ascending=True).drop_duplicates(subset=['cwp'], keep='first'),
@@ -121,4 +132,14 @@ def montagem_eletromecanica_capanema():
     df_unknow_cwp = df_unknow_cwp.groupby(by=['tag'], as_index=False).sum(numeric_only=True)
     df_cwp = pipeline_tools._predict_stock(df_cwp, df_unknow_cwp)
     df_cwp = Reports._get_quantities(df_cwp.sort_values(by='data_inicio', ascending=True), df_recebimento)
+    df_cwp = pd.merge(
+        df_cwp,
+        df_recebimento[['tag', 'peso_un']],
+        on='tag',
+        how='left',
+        suffixes=('_desenho', '_recebimento')
+    )
+    df_cwp.loc[df_cwp['peso_un_recebimento'].isna(), 'peso_un'] = df_cwp['peso_un_desenho']
+    df_cwp.loc[df_cwp['peso_un'].isna(), 'peso_un'] = df_cwp['peso_un_recebimento']
     df_cwp.to_parquet(os.path.join(output_dir, 'cwp_data.parquet'), index=False)
+    df_cwp.to_csv(os.path.join(output_dir, 'cwp_data.csv'), index=False)

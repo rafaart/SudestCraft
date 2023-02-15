@@ -20,7 +20,7 @@ class Reports():
                         sep=';', 
                         index_col=False,
                         header=0,
-                        usecols=[' TAG/CÓDIGO ', ' QT RECEBIDA ', ' FORNECEDOR ']
+                        usecols=[' TAG/CÓDIGO ', ' QT RECEBIDA ', ' FORNECEDOR ', ' ATTR_VALUE']
                     )
                 if 'desenho.csv' in item.lower():
                     self.df_desenho = pd.read_csv(
@@ -68,21 +68,30 @@ class Reports():
         df['chave'] = df['cwp_number'].str.zfill(3) + '-' + df['tag']
         df = df.drop(columns=[' Nº LM'])
         df = df.drop_duplicates(subset=['cwp', 'tag'])
-
-        df.loc[df['tag'] == '93644A', 'peso_un'] = 66.7
-        df.loc[df['tag'] == '1033076', 'peso_un'] = 0.083
-        df.loc[df['tag'] == 'TR-03-TR-68-0045-03-68-0045G', 'peso_un'] = 214.945
-        df.loc[df['tag'] == 'TR-03-TR-68-0090-03-68-0090AE', 'peso_un'] = 124.805
-        df.loc[df['tag'] == 'TR-03-TR-68-0090-03-68-0090BY', 'peso_un'] = 2.91375
-
         return df
 
     @staticmethod
     def _clean_recebimento(df):
-        df = df.rename(columns={' TAG/CÓDIGO ': 'tag', ' QT RECEBIDA ': 'qtd_recebida', ' FORNECEDOR ': 'fornecedor'})
+        df = df.rename(columns={
+            ' TAG/CÓDIGO ': 'tag', 
+            ' QT RECEBIDA ': 'qtd_recebida', 
+            ' FORNECEDOR ': 'fornecedor',
+            ' ATTR_VALUE': 'peso_un'
+        })
         df['tag'] = df['tag'].str.upper().str.replace(' ', '')
         df['qtd_recebida'] = df['qtd_recebida'].astype(float)
-        df = df.groupby('tag', as_index=False).sum()
+        df['peso_un'] = df['peso_un'].astype(float)
+
+        df_categorical = df[['tag', 'fornecedor', 'peso_un']].drop_duplicates(subset='tag' ,keep='first')
+        df_numerical = df[['tag', 'qtd_recebida']].groupby('tag', as_index=False).sum()
+
+        df = pd.merge(
+            df_numerical,
+            df_categorical,
+            on='tag',
+            how='left'
+        )
+        
         return df
 
     @staticmethod
@@ -127,4 +136,11 @@ class Reports():
                 else:
                     df.loc[idx, 'qtd_recebida'] = qtd_recebida
                     df_warehouse.loc[df_warehouse['tag'] == row['tag'], 'qtd_recebida'] = 0
+
+        df_warehouse = df_warehouse.loc[df_warehouse['qtd_recebida'] > 0, ['tag', 'qtd_recebida', 'peso_un']]
+        df_warehouse['cwp'] = 'CWP NÃO ENCONTRADO'
+        df = pd.concat([
+            df,
+            df_warehouse
+        ])
         return df

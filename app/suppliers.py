@@ -173,8 +173,6 @@ class SuppliersLX():
         self.df_lx = df
 
 
-        
-
 class CronogramaMasterConstrucap:
     def __init__(self, source_dir) -> None:
         for item in os.listdir(source_dir):

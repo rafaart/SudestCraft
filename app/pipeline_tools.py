@@ -149,6 +149,9 @@ def break_down_ifc_sinosteel(df):
         if count == 2:
             for idx, file_name in enumerate(df.loc[df['cwp'] == cwp, 'file_name'].drop_duplicates(keep='first')):
                 df.loc[(df['cwp'] == cwp) & (df['file_name'] == file_name), 'part'] = 'Parte ' + str(idx + 1)
+        if count == 3:
+            for idx, file_name in enumerate(df.loc[df['cwp'] == cwp, 'file_name'].drop_duplicates(keep='first')):
+                df.loc[(df['cwp'] == cwp) & (df['file_name'] == file_name), 'part'] = 'Parte ' + str(idx + 1)
     return df
 
 

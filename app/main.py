@@ -1,10 +1,10 @@
 from dotenv import load_dotenv
-from config import run_config
+from config.config import run_config
 load_dotenv('.env')
 run_config()
 
-import pipeline
-from pipelines import lx_check
+from pipelines import gestao_materiais, montagem_eletromecanica, bim_x_pwp
+
 
 
 # lx_check.run_pipeline(
@@ -16,31 +16,12 @@ from pipelines import lx_check
 # )
 
 
-# pipeline.montagem_eletromecanica_newsteel(
-#     output_dir=r'C:\Users\EmmanuelSantana\VERUM PARTNERS\VERUM PARTNERS - VAL2018021\00.TI\Proj - New Steel\BI\01. Dashboards Ativos\Montagem Eletromecanica'
-# )
+# montagem_eletromecanica.newsteel()
+# gestao_materiais.newsteel()
+# bim_x_pwp.famsteel()
 
-pipeline.fornecimento_new_steel_fam( 
-    output_dir=r'C:\Users\EmmanuelSantana\VERUM PARTNERS\VERUM PARTNERS - VAL2018021\00.TI\Proj - New Steel\BI\01. Dashboards Ativos\Fornecimento'
-)
 
-# pipeline.gestao_materiais_newsteel(
-#     output_dir=r'C:\Users\EmmanuelSantana\VERUM PARTNERS\VERUM PARTNERS - VAL2018021\00.TI\Proj - New Steel\BI\01. Dashboards Ativos\Gestão de Materiais'
-# )
-
-# pipeline.montagem_eletromecanica_capanema(
-#     output_dir=r'C:\Users\EmmanuelSantana\VERUM PARTNERS\VERUM PARTNERS - VAL2018021\00.TI\Proj - Capanema\BI\01. Dashboards Ativos\Montagem Eletromecanica'
-# )
-
-# pipeline.fornecimento_capanema_codeme(
-#     output_dir=r'C:\Users\EmmanuelSantana\VERUM PARTNERS\VERUM PARTNERS - VAL2018021\00.TI\Proj - Capanema\BI\01. Dashboards Ativos\Fornecimento\Codeme'
-# )
-
-# pipeline.fornecimento_capanema_sinosteel(
-#     output_dir=r'C:\Users\EmmanuelSantana\VERUM PARTNERS\VERUM PARTNERS - VAL2018021\00.TI\Proj - Capanema\BI\01. Dashboards Ativos\Fornecimento\Sinosteel'
-# )
-
-# pipeline.gestao_materiais_capanema(
-#     output_dir=r'C:\Users\EmmanuelSantana\VERUM PARTNERS\VERUM PARTNERS - VAL2018021\00.TI\Proj - Capanema\BI\01. Dashboards Ativos\Gestão de Materiais'
-# )
-
+montagem_eletromecanica.capanema()
+gestao_materiais.capanema()
+bim_x_pwp.codeme()
+bim_x_pwp.sinosteel()
