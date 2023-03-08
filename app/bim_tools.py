@@ -33,4 +33,7 @@ class IfcDataBase():
     def _get_data(self):
         for table in self.tables:
             self.__dict__[table] = pd.read_sql_query(f"SELECT * FROM {table}", self.cnx)
+
+
+
             

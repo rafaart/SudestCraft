@@ -14,7 +14,7 @@ def newsteel():
     fam_structure = suppliers.FamStructure(os.environ['FORNECEDORES_PATH_NEWSTEEL'])
     pq = suppliers.PQSimplified(os.environ['PQ_PATH_NEWSTEEL'])
     suppliers_map = suppliers.SuppliersLX(os.environ['LX_PATH_NEWSTEEL'], os.environ['MAPPER_PATH_NEWSTEEL'])
-    reports = Reports(source_dir=os.environ['REPORTS_PATH_NEWSTEEL'])
+    reports = Reports(os.environ['REPORTS_PATH_NEWSTEEL'])
 
     df_construcap = construcap.get_report()
     df_aumond = aumond.get_report()

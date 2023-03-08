@@ -1,10 +1,10 @@
 import os
-import ifcopenshell.geom
+
 
 class Ifc():
     config = {
         'FAM CONSTRUCOES':{
-            'geometry_settings': None,
+            'geometry_settings': False,
             'params': {
                 'tag': ('Tekla Assembly', 'Assembly/Cast unit Mark'),
                 'cwp': ('Default', 'USER_FIELD_1'),
@@ -12,7 +12,7 @@ class Ifc():
             }
         },
         'CODEME ENGENHARIA':{
-            'geometry_settings': None,
+            'geometry_settings': False,
             'params': {
                 'tag': ('Tekla Assembly', 'Assembly/Cast unit Mark'),
                 'cwp': ('Default', 'USER_FIELD_4'),
@@ -20,7 +20,7 @@ class Ifc():
             }
         },
         'SINOSTEEL':{
-            'geometry_settings': ifcopenshell.geom.settings(),
+            'geometry_settings': True,
             'params': {
                 'tag': ('Tekla Assembly', 'Assembly/Cast unit Mark'),
                 'cwp': ('Default', 'USER_FIELD_1'),
@@ -57,6 +57,7 @@ class Project():
         self.OUTPUT_SINOSTEEL = self.DASHBOARD_PATH + r'\Fornecimento\Sinosteel'
         self.OUTPUT_MONTAGEM_ELETROMECANICA = self.DASHBOARD_PATH + r'\Montagem Eletromecanica'
         self.OUTPUT_GESTAO_MATERIAIS = self.DASHBOARD_PATH + r'\Gestão de Materiais'
+        self.OUTPUT_ML_LX = self.DASHBOARD_PATH + r'\Checagem de LX'
 
     def __repr__(self) -> str:
         return self.name

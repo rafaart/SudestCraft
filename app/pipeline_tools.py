@@ -1,5 +1,23 @@
 import pandas as pd
 
+def breakdown_by_axis(df,groupby, axis):
+    for cwa_file in df[groupby].drop_duplicates(keep='first'):
+        z_median = df.loc[df[groupby] == cwa_file, axis].median()
+        df.loc[(df[groupby] == cwa_file) & (df[axis].astype(float) <= z_median), 'part'] = 'Parte 1'
+        df.loc[(df[groupby] == cwa_file) & (df[axis].astype(float) > z_median), 'part'] = 'Parte 2'
+    return df
+
+
+def breakdown_by_file_count(df,groupby, min):
+    for group in df[groupby].drop_duplicates(keep='first'):
+        count = len(df.loc[df[groupby] == group, 'file_name'].drop_duplicates(keep='first'))
+        if count >= min:
+            for idx, file_name in enumerate(df.loc[df[groupby] == group, 'file_name'].drop_duplicates(keep='first')):
+                df.loc[(df[groupby] == group) & (df['file_name'] == file_name), 'part'] = 'Parte ' + str(idx + 1)
+    return df
+
+
+
 def get_quantities_fam(df, df_warehouse):   
     df['qtd_recebida'] = 0
     for idx, row in df.iterrows():
@@ -98,16 +116,6 @@ def apply_status_sinosteel(row):
     return status
 
 
-def break_down_ifc_fam(df):
-    for cwa_file in df['cwa_file'].drop_duplicates(keep='first'):
-        if len(df.loc[df['cwa_file'] == cwa_file]) > 14000:
-            z_median = df.loc[df['cwa_file'] == cwa_file, 'elevation'].median()
-            df.loc[(df['cwa_file'] == cwa_file) & (df['elevation'].astype(float) <= z_median), 'part'] = 'Parte 1'
-            df.loc[(df['cwa_file'] == cwa_file) & (df['elevation'].astype(float) > z_median), 'part'] = 'Parte 2'
-        else:
-            df.loc[(df['cwa_file'] == cwa_file), 'part'] = 'Parte 1'
-    return df
-
 
 def break_down_ifc_codeme(df):
     ativos = df['pwp'].drop_duplicates(keep='first')
@@ -135,24 +143,6 @@ def break_down_ifc_codeme(df):
     return df
 
 
-def break_down_ifc_sinosteel(df):
-    df.loc[~df['status'].isin(['1.Recebido', '2.Não entregue']), 'chave'] = df['cwp'] + "-" + df['cwp']
-    df.loc[df['status'].isin(['1.Recebido', '2.Não entregue']), 'chave'] = df['cwp'] + "-" +df['tag']
-
-    for file_name in df['file_name'].drop_duplicates(keep='first'):
-        x_median = df.loc[df['file_name'] == file_name, 'x'].median()
-        df.loc[(df['file_name'] == file_name) & (df['x'].astype(float) <= x_median), 'part'] = 'Parte 1'
-        df.loc[(df['file_name'] == file_name) & (df['x'].astype(float) > x_median), 'part'] = 'Parte 2'
-
-    for cwp in df['cwp'].drop_duplicates(keep='first'):
-        count = len(df.loc[df['cwp'] == cwp, 'file_name'].drop_duplicates(keep='first'))
-        if count == 2:
-            for idx, file_name in enumerate(df.loc[df['cwp'] == cwp, 'file_name'].drop_duplicates(keep='first')):
-                df.loc[(df['cwp'] == cwp) & (df['file_name'] == file_name), 'part'] = 'Parte ' + str(idx + 1)
-        if count == 3:
-            for idx, file_name in enumerate(df.loc[df['cwp'] == cwp, 'file_name'].drop_duplicates(keep='first')):
-                df.loc[(df['cwp'] == cwp) & (df['file_name'] == file_name), 'part'] = 'Parte ' + str(idx + 1)
-    return df
 
 
 def get_quantities_montagem_eletromecanica(df, df_warehouse, by):   

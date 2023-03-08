@@ -37,7 +37,7 @@ class Summary:
             'Component Name': 'tag',
             'Component UID': 'guid' 
         })
-        df = df.loc[df['proposito'].str.contains('Montagem')]
+        df = df.loc[df['proposito'].str.contains('Montagem', na=False)]
         df= df.sort_values(by=['data_inicio', 'proposito'], ascending=[True, False])
         df = df.dropna(subset='tag')
         df = df.drop_duplicates(subset=['guid', 'tag'], keep='first')     

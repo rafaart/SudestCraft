@@ -1,13 +1,5 @@
-
-import suppliers
-import pandas as pd
-
-lx_capanema = r'C:\Users\emman\VERUM PARTNERS\VERUM PARTNERS - VAL2018021\00.TI\Proj - Capanema\BI\02. Repositório de Arquivos\LX\LX Geral'
-mapper_capanema = r"C:\Users\emman\VERUM PARTNERS\VERUM PARTNERS - VAL2018021\00.TI\Proj - Capanema\BI\02. Repositório de Arquivos\LX"
-
-suppliers_map = suppliers.SuppliersLX(lx_capanema, mapper_capanema)
-suppliers_map._run_pipeline()
-df = suppliers_map.df_report
-# print(report.columns)
-print(df.loc[df['file_name'].str.contains('DF-ML-0000CF-M-00003-M-00096'), ['descricao', 'peso_un', 'file_name']])
-
+from bim_tools import TracerFullReport
+tracer = TracerFullReport(r'C:\Users\emman\OneDrive\Documentos\Verum\gambiarra\stagging')
+df_tracer = tracer.get_report()
+# print(df_tracer)
+print(df_tracer.loc[df_tracer['tag'].str.contains('CF12-2780E', na=False)])

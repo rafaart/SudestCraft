@@ -137,8 +137,10 @@ class SuppliersLX():
                             except:
                                 row = pd.DataFrame({'file': [item], 'sheet': [sheet]})
                                 df_errors = pd.concat([df_errors, row], axis=0, ignore_index=True)          
-                except:
-                    pass                 
+                except Exception as e:
+                    print("Error when reading: ", os.path.join(self.source_dir, item))
+                    row = pd.DataFrame({'file': [item], 'sheet': None})
+                    df_errors = pd.concat([df_errors, row], axis=0, ignore_index=True)                
         self.df_raw = pd.concat(worksheets, axis=0, ignore_index=True)
         self.df_errors = df_errors
 
@@ -163,11 +165,12 @@ class SuppliersLX():
         df['cwp_number'] = df['cwp'].str.split('-').str[-1]
         df['chave'] = df['cwp_number'].str.zfill(3) + '-' + df['tag']
         df.loc[df['peso_un'].str.contains(',', na=False, regex=False), 'peso_un'] = df['peso_un'].str.replace('.', '').str.replace(',', '.')
-        df['peso_un'] = df['peso_un'].apply(lambda x: 0 if '-' in str(x) else float(x) )
+        df['peso_un'] = df['peso_un'].apply(lambda x: 0 if '-' in str(x) else float(x))
+        df['qtd_lx'] = df['qtd_lx'].astype(float)
 
         keys = ['cwp', 'cod_ativo', 'tag'] if self.grouped_by_building else ['cwp', 'tag']
-        df_numeric = df[keys + ['qtd_lx']].copy().groupby(by=keys, as_index=False).sum(numeric_only=True).round(0)
-        df_categorical = df.drop(columns=['qtd_lx']).copy().drop_duplicates(subset=keys, keep='first')
+        df_numeric = df[keys + ['qtd_lx']].groupby(by=keys, as_index=False).sum(numeric_only=True).round(0)
+        df_categorical = df.copy().drop(columns=['qtd_lx']).drop_duplicates(subset=keys, keep='first')
         df = pd.merge(df_numeric, df_categorical, how='left', on=keys)
 
         self.df_lx = df

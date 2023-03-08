@@ -2,19 +2,18 @@ import os
 import ifcopenshell
 import ifcopenshell.geom
 import pandas as pd
-import dill
 from config.config import Ifc
 from suppliers import SuppliersLX
-from bim_tools import IfcDataBase, IfcElement, IfcDataExplorer, extract_params
+from bim_tools import IfcDataBase
 import numpy as np
 import multiprocessing as mp
-from multiprocessing import shared_memory
 import time
 import sys
 
 
 config = Ifc.config
 num_workers = mp.cpu_count()  
+
 
 def _get_colors(geometry_settings, element):
     try:
@@ -29,10 +28,10 @@ def _get_colors(geometry_settings, element):
     return {'color_r': color_r, 'color_g': color_g, 'color_b': color_b}
 
 
-def _params_by_id(row, ifc):
+def _params_by_id(row, ifc, geometry_settings):
     guid = row['IfcId']
     config = row['config']
-    geometry_settings = config['geometry_settings']
+    geometry_settings = geometry_settings if config['geometry_settings'] else None
     config = config['params']
     element = ifc.by_guid(guid)
     params = {'IfcId': guid}
@@ -60,8 +59,10 @@ def _params_by_id(row, ifc):
 
 def _process_data_chunk(ifc_path, df_data_chunk):
     ifc = ifcopenshell.open(ifc_path)
-    params = list(df_data_chunk.apply(_params_by_id, ifc=ifc, axis=1))
+    geometry_settings = ifcopenshell.geom.settings()
+    params = list(df_data_chunk.apply(_params_by_id, ifc=ifc, geometry_settings=geometry_settings, axis=1))
     return pd.DataFrame(params)
+
 
 
 
@@ -96,6 +97,7 @@ def codeme(input_ifc_folder, input_db_folder, output_folder, use_files=None):
 
         df_elements['config'] = df_elements['supplier'].apply(lambda suppl: config[suppl])
         data_chunks = np.array_split(df_elements[['IfcId', 'config']], num_workers)
+        
 
         with mp.Pool(processes=num_workers) as pool:
             pool_results = [pool.apply_async(_process_data_chunk, (ifc_file_path, chunk)) for chunk in data_chunks]
@@ -110,6 +112,47 @@ def codeme(input_ifc_folder, input_db_folder, output_folder, use_files=None):
         )
         df_main.to_parquet(destination_file_path, index=False)
 
+
+
+def sinosteel(input_ifc_folder, input_db_folder, output_folder, use_files=None):
+    print('Number of workers: ', num_workers)
+    lx_capanema_dir = SuppliersLX(os.environ['LX_PATH_CAPANEMA'], os.environ['MAPPER_PATH_CAPANEMA'])
+    df_lx = lx_capanema_dir.get_report()
+    df_lx = df_lx.loc[df_lx['supplier'] == 'SINOSTEEL']
+    df_lx = df_lx[['cwp', 'supplier']].drop_duplicates(subset='cwp', keep='first')
+    files_names = os.listdir(input_db_folder)
+    if use_files:
+        use_files = use_files if isinstance(use_files, list) else [use_files]
+        files_names = [file for file in files_names if file.split('.')[0] in use_files]
+
+    files_names = [name for name in files_names if name[0:25] in df_lx['cwp'].to_list()]
+    for file_name in files_names:
+        print('Processing file: ', file_name.split('.')[0])
+        db_file_path = os.path.join(input_db_folder, file_name)
+        ifc_file_path = os.path.join(input_ifc_folder, file_name.replace('.db', '.ifc'))
+        destination_file_path = os.path.join(output_folder, file_name.replace('.db', '.parquet'))
+        
+        ifc_data = IfcDataBase(db_file_path)
+        df_elements = ifc_data.Element
+        
+        df_elements =  df_elements.loc[df_elements['Mesh'].str.len() > 30, ['IfcId', 'Mesh']]
+        df_elements['ifc_file_name'] = os.path.basename(file_name).replace('.db', '')
+        df_elements['supplier'] = 'SINOSTEEL'
+        df_elements['config'] = df_elements['supplier'].apply(lambda suppl: config[suppl])
+        data_chunks = np.array_split(df_elements[['IfcId', 'config']], num_workers)
+
+        with mp.Pool(processes=num_workers) as pool:
+            pool_results = [pool.apply_async(_process_data_chunk, (ifc_file_path, chunk)) for chunk in data_chunks]
+            results = [res.get() for res in pool_results]
+        
+        df_params = pd.concat(results)
+        df_main = pd.merge(
+            left=df_elements,
+            right=df_params,
+            on='IfcId',
+            how='left'
+        )
+        df_main.to_parquet(destination_file_path, index=False)
 
 
 
