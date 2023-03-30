@@ -1,3 +1,4 @@
+
 import os
 
 
@@ -8,15 +9,21 @@ class Ifc():
             'params': {
                 'tag': ('Tekla Assembly', 'Assembly/Cast unit Mark'),
                 'cwp': ('Default', 'USER_FIELD_1'),
-                'position_code': ('Tekla Assembly', 'Assembly/Cast unit position code')
+            }
+        },
+        'EMALTO':{
+            'geometry_settings': False,
+            'params': {
+                'tag': ('Tekla Assembly', 'ASSEMBLY_POS'),
+                'cwp': ('Tekla Assembly', 'USER_FIELD_1'),
+                'fabricante': ('Tekla Assembly', 'USER_FIELD_2'),
             }
         },
         'CODEME ENGENHARIA':{
             'geometry_settings': False,
             'params': {
-                'tag': ('Tekla Assembly', 'Assembly/Cast unit Mark'),
+                'tag': ('Default', 'USER_FIELD_3'),
                 'cwp': ('Default', 'USER_FIELD_4'),
-                'position_code': ('Tekla Assembly', 'Assembly/Cast unit position code')
             }
         },
         'SINOSTEEL':{
@@ -24,7 +31,6 @@ class Ifc():
             'params': {
                 'tag': ('Tekla Assembly', 'Assembly/Cast unit Mark'),
                 'cwp': ('Default', 'USER_FIELD_1'),
-                'position_code': ('Tekla Assembly', 'Assembly/Cast unit position code')
             }
         }
     }
@@ -48,11 +54,15 @@ class Project():
         self.MASTERPLAN_PATH = self.REPOSITORY_PATH + r'\Cronogramas\Masterplan'
         self.FORNECEDORES_PATH = self.REPOSITORY_PATH + r'\Cronogramas\Fornecedores'
         self.MONTADORA_PATH = self.REPOSITORY_PATH + r'\Cronogramas\Montadora'
-        self.TRACER_PATH = self.REPOSITORY_PATH + r'\Modelos BIM\Stagging Files'
-        self.ROMANEIO_PATH = self.REPOSITORY_PATH + r'\Romaneio FAM Steel'
+        self.TRACER_PATH = self.REPOSITORY_PATH + r'\Modelos BIM\Stagging'
+        self.PRODUCAO_PATH = self.REPOSITORY_PATH + r'\Status de Producao'
         self.PQ_PATH = self.REPOSITORY_PATH + r'\PQ'
+        self.IFC_PATH = self.REPOSITORY_PATH + r'\Modelos BIM\IFC Editados'
+        self.DB_PATH = self.REPOSITORY_PATH + r'\Modelos BIM\DB Tracer'
+        self.STAGGING_PATH = self.REPOSITORY_PATH + r'\Modelos BIM\Stagging'
 
         self.OUTPUT_FAM = self.DASHBOARD_PATH + r'\Fornecimento\FAM Steel'
+        self.OUTPUT_EMALTO = self.DASHBOARD_PATH + r'\Fornecimento\Emalto'
         self.OUTPUT_CODEME = self.DASHBOARD_PATH + r'\Fornecimento\Codeme'
         self.OUTPUT_SINOSTEEL = self.DASHBOARD_PATH + r'\Fornecimento\Sinosteel'
         self.OUTPUT_MONTAGEM_ELETROMECANICA = self.DASHBOARD_PATH + r'\Montagem Eletromecanica'

@@ -1,11 +1,14 @@
 import pandas as pd
 
-def breakdown_by_axis(df,groupby, axis):
-    for cwa_file in df[groupby].drop_duplicates(keep='first'):
-        z_median = df.loc[df[groupby] == cwa_file, axis].median()
-        df.loc[(df[groupby] == cwa_file) & (df[axis].astype(float) <= z_median), 'part'] = 'Parte 1'
-        df.loc[(df[groupby] == cwa_file) & (df[axis].astype(float) > z_median), 'part'] = 'Parte 2'
+def breakdown_by_axis(df, groupby, axis, n_parts):
+    labels = [f'Parte {i+1}' for i in range(n_parts)]
+    for group in df[groupby].drop_duplicates(keep='first'):
+        df_bins = pd.qcut(df.loc[df[groupby] == group, axis].rank(method='first'), labels=labels, q=n_parts, retbins=False, duplicates='drop')
+        df.loc[df[groupby] == group, 'part'] = df_bins
+    df['part'] = df['part'].astype('object')
     return df
+
+
 
 
 def breakdown_by_file_count(df,groupby, min):
@@ -56,6 +59,25 @@ def get_quantities(df, df_warehouse):
         else:
             df.iloc[[idx]]['qtd_recebida'] = 0
     return df
+
+
+def apply_status_emalto(row):
+    if (row['qtd_programacao'] + row['qtd_preparacao'] + row['qtd_fabricacao'] + row['qtd_expedicao']) < 1:
+        status = '5.Inconsistente'
+    elif row['order'] <= row['qtd_programacao']:
+        status = '1.Programação'
+    elif row['order'] <= row['qtd_programacao'] + row['qtd_preparacao']:
+        status = '2.Preparação'
+    elif row['order'] <= row['qtd_programacao'] + row['qtd_preparacao'] + row['qtd_fabricacao']:
+        status = '3.Fabricação'
+    elif row['order'] <= row['qtd_programacao'] + row['qtd_preparacao'] + row['qtd_fabricacao'] + row['qtd_expedicao']:
+        status = '4.Expedição'
+    # elif row['order'] <= row['qtd_programacao'] + row['qtd_fabricacao'] + row['qtd_embarque'] + row['qtd_entregue'] + row['qtd_recebida']:
+    #     status = '5.Recebido VALE'
+    else:
+        status = '5.Inconsistente'
+    return status
+
 
 
 def apply_status_fam(row):
@@ -117,30 +139,6 @@ def apply_status_sinosteel(row):
 
 
 
-def break_down_ifc_codeme(df):
-    ativos = df['pwp'].drop_duplicates(keep='first')
-    for ativo in ativos:
-        sample_size = len(df.loc[df['pwp'] == ativo])
-
-        if 11000 >= sample_size:
-            quantil = pd.DataFrame(df.loc[df['pwp'] == ativo, 'elevation'].quantile([0, 1])).reset_index()
-
-        if 20000 >= sample_size > 11000:
-            quantil = pd.DataFrame(df.loc[df['pwp'] == ativo, 'elevation'].quantile([0, 0.5, 1])).reset_index()
-
-        if 30000 >=  sample_size > 20000:
-            quantil = pd.DataFrame(df.loc[df['pwp'] == ativo, 'elevation'].quantile([0, 0.25, 0.5, 0.75, 1])).reset_index()
-
-        if sample_size > 30000:
-            quantil = pd.DataFrame(df.loc[df['pwp'] == ativo, 'elevation'].quantile([0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1])).reset_index()
-        
-        quantil['min_elevation'] = quantil['elevation'].shift(1)
-        quantil = quantil.dropna().reset_index(drop=True)
-        quantil.loc[0, 'min_elevation'] = -1
-
-        for idx, row in quantil.iterrows():
-            df.loc[(df['pwp'] == ativo) & (row['elevation'] >= df['elevation'].astype(float)) & (df['elevation'].astype(float) > row['min_elevation']), 'lvl'] = 'lvl ' + str(idx + 1).zfill(2)
-    return df
 
 
 

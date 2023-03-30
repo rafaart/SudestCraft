@@ -104,7 +104,7 @@ class SuppliersLX():
             'Documento': 'file_name', 
             'Empresa': 'supplier'
         })
-        df['supplier'] = df['supplier'].str.split(' ').str[:2].str.join(' ')
+        df['supplier'] = df['supplier'].str.split(' ').str[0].str.replace(' ', '')
         self.df_mapper = df
 
     def _read_files(self):
@@ -183,7 +183,7 @@ class CronogramaMasterConstrucap:
                 if 'construcap' in item.lower():
                     self.df_workbook = pd.read_excel(
                         os.path.join(source_dir, item),
-                        usecols=['Nível', 'P0400: cwa_id', "P0400: CWP's / EWP's / PWP's_Work_Type", 'Activity Name', 'Start', 'Finish']
+                        usecols=['Item', 'P0400: cwa_id', "P0400: CWP's / EWP's / PWP's_Work_Type", 'Activity Name', 'Start', 'Finish']
                     )
                     break
     
@@ -193,14 +193,14 @@ class CronogramaMasterConstrucap:
     @staticmethod
     def _clean_report(df):
         df = df.rename(columns={
-            'Nível': 'nivel',
+            'Item': 'item',
             'P0400: cwa_id': 'cwa',
             "P0400: CWP's / EWP's / PWP's_Work_Type": 'cwp',
             'Activity Name': 'descricao',
             'Start': 'data_inicio',
             'Finish': 'data_termino'
         })
-        df = df.loc[df['nivel'] > 3]
+        df = df.loc[df['item'].str.count('.') > 2]
         df = df.dropna(subset=['cwp'])
         df.loc[df['cwp'].str.contains('-CWPp'), 'atividade'] = 'pre-montagem'
         df.loc[df['cwp'].str.contains('-CWPm'), 'atividade'] = 'montagem'
@@ -282,7 +282,6 @@ class Aumond():
                         if 'aumond' in sheet_name.lower():
                             self.df_scheduler = workbook.parse(
                                 sheet_name=sheet_name,
-                                usecols=['Start', 'Finish', 'PWP (PWPe/PWP/PWPl)']
                             )
                             break
 
@@ -394,7 +393,7 @@ class ModeloCronogramaCapanema():
         return df
 
 
-class RomaneioFAM():
+class ProducaoFAM():
     def __init__(self, source_dir) -> None:
         for item in os.listdir(source_dir):
             if os.path.isfile(os.path.join(source_dir, item)):
@@ -444,4 +443,91 @@ class RomaneioFAM():
         df = pd.merge(df_numeric, df_categorical, how='left', on='chave')
 
         df['total_sum'] = df[numeric_columns].sum(axis=1) - df['qtd_total']
+        self.df_report = df
+
+
+class ProducaoEMALTO():
+    def __init__(self, source_dir) -> None:
+        for item in os.listdir(source_dir):
+            if os.path.isfile(os.path.join(source_dir, item)):
+                if 'relatório de acompanhamento' in item.lower():
+                    self.df_raw = pd.read_excel(
+                        os.path.join(source_dir, item),
+                        skiprows=12,
+                        header=2,
+                        na_values=['(kg)', '~~~~~~~~~', ' '],
+                        usecols=[
+                            'Fase', 
+                            'Marca', 
+                            'Quant.', 
+                            'Peso Total', 
+                            'Preparação', 
+                            'Montagem', 
+                            'Soldagem', 
+                            'Acabamento', 
+                            'Jateamento',
+                            'Pintura', 
+                            'Terceirização', 
+                            'Acessórios', 
+                            'Expedição',
+                            'Previsão de embarque',
+                        ]
+                    )
+                    break
+        else:
+            raise ValueError("Data file not found")
+
+    def get_report(self):
+        self._clean_report()
+        return self.df_report
+    
+    def _clean_report(self):
+        df = self.df_raw
+        df = df.rename(columns={
+            'Fase': 'cwa', 
+            'Marca': 'tag', 
+            'Quant.': 'qtd_total', 
+            'Peso Total': 'peso_total', 
+            'Preparação': 'peso_preparacao', 
+            'Montagem': 'peso_montagem', 
+            'Soldagem': 'peso_soldagem', 
+            'Acabamento': 'peso_acabamento', 
+            'Jateamento': 'peso_jateamento',
+            'Pintura': 'peso_pintura', 
+            'Terceirização': 'peso_terceirizacao', 
+            'Acessórios': 'peso_acessorios', 
+            'Expedição': 'peso_expedicao',
+            'Previsão de embarque': 'data_embarque',
+        })
+        numeric_columns = [
+            'qtd_total', 
+            'peso_total', 
+            'peso_preparacao', 
+            'peso_montagem', 
+            'peso_soldagem', 
+            'peso_acabamento', 
+            'peso_jateamento', 
+            'peso_pintura', 
+            'peso_terceirizacao', 
+            'peso_acessorios', 
+            'peso_expedicao'
+        ]
+        df = df.dropna(axis = 0, how = 'all')
+        df = df.dropna(subset=['tag'])
+        df[numeric_columns] = df[numeric_columns].fillna(0.)
+        df = df.fillna(method='ffill')
+        df['cwa'] = df['cwa'].str.split('-').str[1].str.replace(' ', '')
+        df['cwa_number'] = df['cwa'].str.extract('(\d+)')
+        df['cwa_number'] = df['cwa_number'].str.zfill(3)
+        df['peso_un'] = df['peso_total'] / df['qtd_total']
+        df['peso_programacao'] = df['peso_total'] - df['peso_preparacao']
+        df['peso_fabricacao'] = df[['peso_montagem', 'peso_soldagem', 'peso_acabamento', 'peso_jateamento', 'peso_pintura', 'peso_terceirizacao', 'peso_acessorios']].max(axis=1) - df['peso_expedicao']
+        df['peso_preparacao'] = df['peso_preparacao'] - df['peso_fabricacao']
+
+        df['qtd_programacao'] = df['peso_programacao'] / df['peso_un']
+        df['qtd_preparacao'] = df['peso_preparacao'] / df['peso_un']
+        df['qtd_fabricacao'] = df['peso_fabricacao'] / df['peso_un']
+        df['qtd_expedicao'] = df['peso_expedicao'] / df['peso_un']
+
+        df[['qtd_programacao', 'qtd_preparacao', 'qtd_fabricacao', 'qtd_expedicao']] = df[['qtd_programacao', 'qtd_preparacao', 'qtd_fabricacao', 'qtd_expedicao']].round(0)
         self.df_report = df

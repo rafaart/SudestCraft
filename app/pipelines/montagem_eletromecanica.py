@@ -57,6 +57,7 @@ def newsteel():
     df_unknow_cwp = df_unknow_cwp.groupby(by=['tag'], as_index=False).sum(numeric_only=True)
     df_cwp = pipeline_tools._predict_stock(df_cwp, df_unknow_cwp)
     df_cwp = Reports._get_quantities(df_cwp.sort_values(by='data_inicio', ascending=True), df_recebimento)
+    
     df_cwp.to_parquet(os.path.join(output_dir, 'cwp_data.parquet'), index=False)
     df_cwp.to_csv(os.path.join(output_dir, 'cwp_data.csv'), index=False)
 

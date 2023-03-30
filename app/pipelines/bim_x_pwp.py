@@ -6,24 +6,29 @@ from materials import Reports
 from bim_tools import TracerFullReport
 from masterplan import Masterplan
 
+pd.options.mode.chained_assignment = None
 
 
 def famsteel():
     output_dir = os.environ['OUTPUT_FAM_NEWSTEEL']
 
     cronograma_construcap = suppliers.CronogramaMasterConstrucap(os.environ['MONTADORA_PATH_NEWSTEEL'])
-    romaneio = suppliers.RomaneioFAM(os.environ['ROMANEIO_PATH_NEWSTEEL'])
+    producao = suppliers.ProducaoFAM(os.environ['PRODUCAO_PATH_NEWSTEEL'])
     reports = Reports(os.environ['REPORTS_PATH_NEWSTEEL'])
     tracer = TracerFullReport(os.environ['TRACER_PATH_NEWSTEEL'])
 
     df_cronograma_construcap = cronograma_construcap.get_report()
-    df_romaneio = romaneio.get_report()
+    df_producao = producao.get_report()
     df_desenho = reports.get_status_desenho()
     df_recebimento = reports.get_recebimento()
-    df_tracer = tracer.get_report()
-    
+    df_tracer = tracer.read_stagging_data().get_report()
+    df_tracer = df_tracer.loc[~df_tracer['file_name'].str.contains('VG-P0400', na=False)]
+
+    df_desenho['cwa'] = 'CWA' + df_desenho['cwp'].str.split('-').str[2].str.zfill(3)
+    df_desenho['chave'] = df_desenho['cwa'] + '-' + df_desenho['tag']
+
     df = pd.merge(
-        left=df_romaneio,
+        left=df_producao,
         right=df_desenho, 
         on='chave',
         how='left',
@@ -53,14 +58,61 @@ def famsteel():
     df_tracer.loc[df_tracer['qtd_total'].isna(), 'chave'] = 'CWA' + df_tracer['cwa']
 
     df_tracer['status'] = df_tracer.apply(pipeline_tools.apply_status_fam, axis=1)
-    df_tracer = pipeline_tools.breakdownbyaxis(df_tracer, groupby='cwa_file', axis='elevation')
-
+    df_tracer = pipeline_tools.breakdown_by_axis(df_tracer, groupby='cwa_file', axis='elevation', n_parts=2)
     df_tracer.to_parquet(os.path.join(output_dir, 'tracer_data.parquet'), index=False)
     df.to_parquet(os.path.join(output_dir, 'inventory_data.parquet'), index=False)
 
-    # df_tracer.to_csv(os.path.join(output_dir, 'tracer_data.csv'), index=False)
-    # df.to_csv(os.path.join(output_dir, 'inventory_data.csv'), index=False)
 
+
+def emalto():
+    output_dir = os.environ['OUTPUT_EMALTO_NEWSTEEL']
+
+    cronograma_construcap = suppliers.CronogramaMasterConstrucap(os.environ['MONTADORA_PATH_NEWSTEEL'])
+    producao = suppliers.ProducaoEMALTO(os.environ['PRODUCAO_PATH_NEWSTEEL'])
+    reports = Reports(os.environ['REPORTS_PATH_NEWSTEEL'])
+    tracer = TracerFullReport(os.environ['TRACER_PATH_NEWSTEEL'])
+
+    df_cronograma_construcap = cronograma_construcap.get_report()
+    df_producao = producao.get_report()
+    df_desenho = reports.get_status_desenho()
+    df_recebimento = reports.get_recebimento()
+    df_tracer = tracer.read_stagging_data().get_report()
+
+    df_desenho['cwa_number'] = df_desenho['cwp'].str.split('-').str[2]
+    df = pd.merge(
+        left=df_producao,
+        right=df_desenho, 
+        on=['cwa_number', 'tag'],
+        how='left',
+        suffixes=(None, '_desenho')
+    )
+    df = pd.merge(
+        left=df,
+        right=df_cronograma_construcap[['data_inicio', 'cwp']],
+        on='cwp',        
+        how='left'
+    )
+    df_fill  = df[['cwa_number']].drop_duplicates(keep='first')
+    df = pd.concat([df, df_fill], ignore_index=True)
+    df['chave'] = df['cwa_number'] + '-' + df['tag'].fillna('')
+
+    df_tracer = df_tracer.loc[df_tracer['file_name'].str.contains('VG-P0400', na=False)]
+    df_tracer['cwa_number'] = df_tracer['file_name'].str.split('-').str[2]
+    df_tracer['chave'] = df_tracer['cwa_number'] + '-' + df_tracer['tag'].fillna('')
+
+    df_tracer = pd.merge(
+        left=df_tracer, 
+        right=df, 
+        how='left', 
+        on=['cwa_number', 'tag'],
+        suffixes=[None, '_romaneio']
+    )   
+    df_tracer[['qtd_programacao','qtd_preparacao','qtd_fabricacao','qtd_expedicao']] = df_tracer[['qtd_programacao','qtd_preparacao','qtd_fabricacao','qtd_expedicao']].fillna(0)
+    df_tracer['status'] = df_tracer.apply(pipeline_tools.apply_status_emalto, axis=1)
+    df_tracer.loc[df_tracer['status'] == '5.Inconsistente', 'chave'] = df_tracer['cwa_number'] + '-'
+    # df_tracer = pipeline_tools.breakdown_by_axis(df_tracer, groupby='cwa_file', axis='elevation', n_parts=2)
+    df_tracer.to_csv(os.path.join(output_dir, 'tracer_data.csv'), index=False)
+    df.to_csv(os.path.join(output_dir, 'inventory_data.csv'), index=False)
 
 
 def codeme():
@@ -70,18 +122,17 @@ def codeme():
     lx = suppliers.SuppliersLX(os.environ['LX_PATH_CAPANEMA'], os.environ['MAPPER_PATH_CAPANEMA'])
     reports = Reports(os.environ['REPORTS_PATH_CAPANEMA'])
     tracer = TracerFullReport(os.environ['TRACER_PATH_CAPANEMA'])
-
-
     df_lx = lx.get_report()
-    df_numeric = df_lx[['cwp', 'cod_ativo', 'tag', 'qtd_lx']].groupby(['cwp', 'cod_ativo', 'tag'], as_index=False).sum(numeric_only=True)
-    df_categorical = df_lx.drop(columns=['qtd_lx']).drop_duplicates(subset=['cwp', 'cod_ativo', 'tag'], keep='first')
-    df_lx = pd.merge(df_numeric, df_categorical, how='left', on=['cwp', 'cod_ativo', 'tag'])
-    df_lx = df_lx.loc[df_lx['supplier'].str.contains('CODEME', na=False)]
+
+    df_numeric = df_lx[['cwp', 'tag', 'qtd_lx']].groupby(['cwp', 'tag'], as_index=False).sum(numeric_only=True)
+    df_categorical = df_lx.drop(columns=['qtd_lx']).drop_duplicates(subset=['cwp', 'tag'], keep='first')
+    df_lx = pd.merge(df_numeric, df_categorical, how='left', on=['cwp', 'tag'])
+    df_lx = df_lx.loc[df_lx['supplier'].str.contains('CODEME ENGENHARIA', na=False)]
 
     df_main = pd.merge(
         left=df_lx,
         right=reports.get_status_desenho(), 
-        on=['chave'],
+        on=['cwp', 'tag'],
         how='left',
         suffixes=(None, '_materials')
     )
@@ -90,40 +141,50 @@ def codeme():
         left=df_main,
         right=masterplan.get_report(), 
         on='cwp',
-        how='left',
-        suffixes=(None, '_masterplan')
+        how='left'
     )
-    
+
     df_main = pipeline_tools.get_quantities(df_main.sort_values(by='data_inicio', ascending=True), reports.get_recebimento())
     df_main['qtd_faltante'] = df_main['qtd_lx'] - df_main['qtd_recebida']
-    df_fill = df_main[['cwp', 'cwp_number', 'sheet_name', 'cod_ativo']].drop_duplicates(subset=['cwp_number'], keep='first')
-    df_fill['tag'] = df_main['cwp_number'].astype(str) + df_main['cod_ativo'].str.replace('ED', '')
-    df_fill = df_fill.drop_duplicates(subset=['cwp_number'], keep='first')
+    df_main['cod_navegacao'] = df_main['cwp_number'] + '-' + df_main['cod_ativo']
+    df_main['chave'] = df_main['cwp'] + '-' + df_main['tag']
+
+    df_fill = df_main[['cwp', 'cod_navegacao']].drop_duplicates(subset=['cwp'], keep='first')
+    df_fill['chave'] = df_fill['cwp']
     df_main = pd.concat([df_main,df_fill], ignore_index=True)
-    df_main['chave'] = df_main['cwp_number'].str.zfill(3) + '-' + df_main['tag']
-    df_main['cod_navegacao'] = df_main.apply(lambda row: row['cwp_number'] + row['cod_ativo'].replace('ED', ''), axis=1)
+   
+    
+    df_tracer = tracer.read_stagging_data().drop_missplaced_elements().get_report()
+    df_tracer = df_tracer.loc[df_tracer['cwp'].isin(df_main['cwp'].drop_duplicates(keep='first'))]
+    df_main = df_main.loc[df_main['cwp'].isin(df_tracer['cwp'].drop_duplicates(keep='first'))]
 
-    df_tracer = tracer.get_report()
-    df_tracer = df_tracer.loc[df_tracer['file_name'].str.split('-').str[0].isin(df_main['cwp_number'])]
-    df_main = df_main.loc[df_main['cwp_number'].isin(df_tracer['file_name'].str.split('-').str[0])]
-
+    df_tracer['cod_ativo'] = df_tracer['file_name'].str[26:]
+    df_tracer = df_tracer.loc[df_tracer['cwp'] == df_tracer['file_name'].str[0:25]]
     df_tracer = pd.merge(
         left=df_tracer, 
-        right=df_main[['tag', 'qtd_recebida', 'qtd_lx', 'qtd_desenho', 'qtd_faltante', 'data_inicio', 'peso_un']],
-        on='tag',
+        right=df_main[['cwp', 'tag', 'qtd_recebida', 'qtd_lx', 'qtd_desenho', 'qtd_faltante', 'data_inicio', 'peso_un']],
+        on=['cwp', 'tag'],
         how='left'
-    )   
+    )  
 
     df_tracer['status'] = df_tracer.apply(pipeline_tools.apply_status_codeme, axis=1)
-    df_tracer.loc[~df_tracer['status'].isin(['1.Recebido', '2.Não entregue']), 'chave'] = df_tracer['cwp'] + "-" + df_tracer['pwp']
+    df_tracer.loc[~df_tracer['status'].isin(['1.Recebido', '2.Não entregue']), ['chave', ]] = df_tracer['cwp']
     df_tracer.loc[df_tracer['status'].isin(['1.Recebido', '2.Não entregue']), 'chave'] = df_tracer['cwp'] + "-" +df_tracer['tag']
-    df_tracer = pipeline_tools.break_down_ifc_codeme(df_tracer)
+    df_tracer['part'] = None
+    df_ativos = df_tracer['cod_ativo'].drop_duplicates(keep='first')
+    for cod in df_ativos:
+        sample_size = len(df_tracer.loc[df_tracer['cod_ativo'] == cod])
+        if 11000 >= sample_size:
+            df_tracer.loc[df_tracer['cod_ativo'] == cod] = pipeline_tools.breakdown_by_axis(df_tracer.loc[df_tracer['cod_ativo'] == cod], 'file_name', 'location_z', 1)
+        if 20000 >= sample_size > 11000:
+            df_tracer.loc[df_tracer['cod_ativo'] == cod] = pipeline_tools.breakdown_by_axis(df_tracer.loc[df_tracer['cod_ativo'] == cod], 'file_name', 'location_z', 2)
+        if 30000 >=  sample_size > 20000:
+            df_tracer.loc[df_tracer['cod_ativo'] == cod] = pipeline_tools.breakdown_by_axis(df_tracer.loc[df_tracer['cod_ativo'] == cod], 'file_name', 'location_z', 4)
+        if sample_size > 30000:
+            df_tracer.loc[df_tracer['cod_ativo'] == cod] = pipeline_tools.breakdown_by_axis(df_tracer.loc[df_tracer['cod_ativo'] == cod], 'file_name', 'location_z', 10)
 
     df_tracer.to_parquet(os.path.join(output_dir, 'tracer_data.parquet'), index=False)
     df_main.to_parquet(os.path.join(output_dir, 'inventory_data.parquet'), index=False)
-
-    df_tracer.to_csv(os.path.join(output_dir, 'tracer_data.csv'), index=False)
-    df_main.to_csv(os.path.join(output_dir, 'inventory_data.csv'), index=False)
 
 
 
@@ -144,7 +205,7 @@ def sinosteel():
     df_main = pd.merge(
         left=df_lx,
         right=reports.get_status_desenho(), 
-        on=['chave'],
+        on=['cwp', 'tag'],
         how='left',
         suffixes=(None, '_materials')
     )
@@ -158,41 +219,34 @@ def sinosteel():
 
     df_main = pipeline_tools.get_quantities(df_main.sort_values(by='data_inicio', ascending=True), reports.get_recebimento())
     df_main['qtd_faltante'] = df_main['qtd_lx'] - df_main['qtd_recebida']
-    df_fill = df_main[['cwp']].drop_duplicates(subset=['cwp'], keep='first')
-    df_fill['tag'] = df_main['cwp']
-    df_main = pd.concat([df_main,df_fill], ignore_index=True)
-    df_main['chave'] = df_main['cwp'] + '-' + df_main['tag']
     df_main['cod_navegacao'] = 'CWP' + df_main['cwp_number']
+    df_main['chave'] = df_main['cwp'] + '-' + df_main['tag']
+
+    df_fill = df_main[['cwp', 'cod_navegacao']].drop_duplicates(subset=['cwp'], keep='first')
+    df_fill['chave'] = df_fill['cwp']
+    df_main = pd.concat([df_main,df_fill], ignore_index=True)
    
-    df_tracer = tracer.get_report()
-    print(df_tracer['cwp'].drop_duplicates(keep='first'))
-
-    # df_tracer.loc[df_tracer['file_name'] == '097-1220CF-07', 'cwp'] = 'CF-S1985-008-M-MT-CWP-097'
-    # df_tracer.loc[df_tracer['file_name'] == '738-1360CF-09', 'cwp'] = 'CF-S1985-008-M-MT-CWP-738'
-    # df_tracer.loc[df_tracer['file_name'] == '739-1360CF-12', 'cwp'] = 'CF-S1985-008-M-MT-CWP-739'
-    # df_tracer.loc[df_tracer['file_name'] == '096-1220CF-05', 'cwp'] = 'CF-S1985-008-M-MT-CWP-096'
-
-    # df_tracer = df_tracer.loc[df_tracer['cwp'].isin(df_main['cwp'])]
-    # df_main = df_main.loc[df_main['cwp'].isin(df_tracer['cwp'])]
-
     
-    # df_tracer = pd.merge(
-    #     left=df_tracer, 
-    #     right=df_main[['tag', 'qtd_recebida', 'qtd_lx', 'qtd_desenho', 'qtd_faltante', 'data_inicio', 'peso_un']],
-    #     on='tag',
-    #     how='left'
-    # )   
+    df_tracer = tracer.read_stagging_data().drop_missplaced_elements().get_report()
+    df_tracer = df_tracer.loc[df_tracer['cwp'].isin(df_main['cwp'].drop_duplicates(keep='first'))]
+    df_main = df_main.loc[df_main['cwp'].isin(df_tracer['cwp'].drop_duplicates(keep='first'))]
 
-    # df_tracer['status'] = df_tracer.apply(pipeline_tools.apply_status_sinosteel, axis=1)
-    # df_tracer.loc[~df_tracer['status'].isin(['1.Recebido', '2.Não entregue']), 'chave'] = df_tracer['cwp']
-    # df_tracer.loc[df_tracer['status'].isin(['1.Recebido', '2.Não entregue']), 'chave'] = df_tracer['cwp'] + "-" +df_tracer['tag']
-    # df_tracer = pipeline_tools.breakdown_by_axis(df_tracer, 'file_name', 'x')
-    # df_tracer = pipeline_tools.breakdown_by_file_count(df_tracer, 'cwp', 2)
+    df_tracer = df_tracer.loc[df_tracer['cwp'] == df_tracer['file_name'].str[0:25]]
+    df_tracer = pd.merge(
+        left=df_tracer, 
+        right=df_main[['cwp', 'tag', 'qtd_recebida', 'qtd_lx', 'qtd_desenho', 'qtd_faltante', 'data_inicio', 'peso_un']],
+        on=['cwp', 'tag'],
+        how='left'
+    )  
 
-    # print(df_tracer.head())
+    df_tracer['status'] = df_tracer.apply(pipeline_tools.apply_status_sinosteel, axis=1)
+    df_tracer.loc[~df_tracer['status'].isin(['1.Recebido', '2.Não entregue']), 'chave'] = df_tracer['cwp']
+    df_tracer.loc[df_tracer['status'].isin(['1.Recebido', '2.Não entregue']), 'chave'] = df_tracer['cwp'] + "-" +df_tracer['tag']
+    df_tracer = pipeline_tools.breakdown_by_axis(df_tracer, 'file_name', 'location_x', 2)
+    df_tracer = pipeline_tools.breakdown_by_file_count(df_tracer, 'cwp', 2)
 
-    # df_tracer.to_parquet(os.path.join(output_dir, 'tracer_data.parquet'), index=False)
-    # df_main.to_parquet(os.path.join(output_dir, 'inventory_data.parquet'), index=False)
+    df_tracer.to_parquet(os.path.join(output_dir, 'tracer_data.parquet'), index=False)
+    df_main.to_parquet(os.path.join(output_dir, 'inventory_data.parquet'), index=False)
 
     # df_tracer.to_csv(os.path.join(output_dir, 'tracer_data.csv'), index=False)
     # df_main.to_csv(os.path.join(output_dir, 'inventory_data.csv'), index=False)

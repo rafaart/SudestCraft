@@ -63,16 +63,16 @@ def newsteel():
     df_main = df_main.drop(columns=['obs'])
     df_main = pd.merge(
         df_main,
-        df_recebimento[['tag', 'peso_un']],
+        df_recebimento[['tag', 'peso_un', 'fornecedor']],
         on='tag',
         how='left',
         suffixes=('_desenho', '_recebimento')
     )
     df_main.loc[df_main['peso_un_recebimento'].isna(), 'peso_un'] = df_main['peso_un_desenho']
     df_main.loc[df_main['peso_un'].isna(), 'peso_un'] = df_main['peso_un_recebimento']
-    df_main['supplier'] = df_main['supplier'].fillna('Fornecedor não encontrado')
+    df_main['supplier'] = df_main['supplier'].fillna(df_main['fornecedor'])
     df_main.to_parquet(os.path.join(output_dir, 'report_data.parquet'), index=False)
-    df_main.to_csv(os.path.join(output_dir, 'report_data.csv'), index=False)
+    # df_main.to_csv(os.path.join(output_dir, 'report_data.csv'), index=False)
 
 
 
@@ -138,13 +138,13 @@ def capanema():
     df_main = Reports._get_quantities(df_main.sort_values(by='data_inicio_masterplan', ascending=True), df_recebimento)
     df_main = pd.merge(
         df_main,
-        df_recebimento[['tag', 'peso_un']],
+        df_recebimento[['tag', 'peso_un', 'fornecedor']],
         on='tag',
         how='left',
         suffixes=('_desenho', '_recebimento')
     )
     df_main.loc[df_main['peso_un_recebimento'].isna(), 'peso_un'] = df_main['peso_un_desenho']
     df_main.loc[df_main['peso_un'].isna(), 'peso_un'] = df_main['peso_un_recebimento']
-    df_main['supplier'] = df_main['supplier'].fillna('Fornecedor não encontrado')
+    df_main['supplier'] = df_main['supplier'].fillna(df_main['fornecedor'])
     df_main.to_parquet(os.path.join(output_dir, 'report_data.parquet'), index=False)
-    df_main.to_csv(os.path.join(output_dir, 'report_data.csv'), index=False)
+    # df_main.to_csv(os.path.join(output_dir, 'report_data.csv'), index=False)

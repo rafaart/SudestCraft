@@ -43,7 +43,7 @@ class Reports():
                 
 
     def get_status_desenho(self):
-        return self.__class__._clean_bom(self.df_desenho)
+        return self.__class__._clean_status_desenho(self.df_desenho)
 
     def get_recebimento(self):
         return self.__class__._clean_recebimento(self.df_recebimento)
@@ -53,7 +53,7 @@ class Reports():
 
 
     @staticmethod
-    def _clean_bom(df):
+    def _clean_status_desenho(df):
         df = df.rename(columns={
             ' Tag/Código': 'tag', 
             ' Quantidade em BOM': 'qtd_desenho',
@@ -63,11 +63,11 @@ class Reports():
         df['tag'] = df['tag'].str.replace(' ', '')
         df['tag'] = df['tag'].str.upper()
         df['cwp'] = df[' Nº LM'].str.replace(' ', '').str.split('/').str[-1]
-        df['peso_un'] = df['peso_un'].astype(float)
-        df['cwp_number'] = df['cwp'].str.split('-').str[-1]
-        df['chave'] = df['cwp_number'].str.zfill(3) + '-' + df['tag']
+        df.loc[df['peso_un'] == '  #DIV/0! '] = 0
         df = df.drop(columns=[' Nº LM'])
         df = df.drop_duplicates(subset=['cwp', 'tag'])
+        df[['tag', 'descricao', 'cwp']] = df[['tag', 'descricao', 'cwp']].applymap(lambda x: str(x))
+        df['peso_un'] = df['peso_un'].apply(lambda x: float(x))
         return df
 
     @staticmethod
@@ -81,17 +81,15 @@ class Reports():
         df['tag'] = df['tag'].str.upper().str.replace(' ', '')
         df['qtd_recebida'] = df['qtd_recebida'].astype(float)
         df['peso_un'] = df['peso_un'].astype(float)
-
+        df['fornecedor'] = df['fornecedor'].str.split('-').str[0].str.replace(' ', '')
         df_categorical = df[['tag', 'fornecedor', 'peso_un']].drop_duplicates(subset='tag' ,keep='first')
         df_numerical = df[['tag', 'qtd_recebida']].groupby('tag', as_index=False).sum()
-
         df = pd.merge(
             df_numerical,
             df_categorical,
             on='tag',
             how='left'
         )
-        
         return df
 
     @staticmethod

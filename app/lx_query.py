@@ -1,24 +1,18 @@
-
-import suppliers
+import os
 import pandas as pd
+from suppliers import SuppliersLX
 
-lx_capanema = r'C:\Users\emman\VERUM PARTNERS\VERUM PARTNERS - VAL2018021\00.TI\Proj - Capanema\BI\02. Repositório de Arquivos\LX\LX Geral'
-mapper_capanema = r"C:\Users\emman\VERUM PARTNERS\VERUM PARTNERS - VAL2018021\00.TI\Proj - Capanema\BI\02. Repositório de Arquivos\LX"
+from dotenv import load_dotenv
+from config.config import run_config
+load_dotenv('.env')
+run_config()
 
-suppliers_map = suppliers.SuppliersLX(lx_capanema, mapper_capanema)
-suppliers_map._run_pipeline()
-df = suppliers_map.df_report
-df_error = suppliers_map.df_errors
 
-# lx_newsteel = r'C:\Users\emman\VERUM PARTNERS\VERUM PARTNERS - VAL2018021\00.TI\Proj - New Steel\BI\02. Repositório de Arquivos\LX\LX Geral'
-# mapper_newsteel = r"C:\Users\emman\VERUM PARTNERS\VERUM PARTNERS - VAL2018021\00.TI\Proj - New Steel\BI\02. Repositório de Arquivos\LX"
+lX_dir_newsteel = SuppliersLX(os.environ['LX_PATH_NEWSTEEL'], os.environ['MAPPER_PATH_NEWSTEEL'])
+lX_dir_capanema = SuppliersLX(os.environ['LX_PATH_CAPANEMA'], os.environ['MAPPER_PATH_CAPANEMA'])
 
-# suppliers_map = suppliers.SuppliersLX(lx_newsteel, mapper_newsteel)
-# suppliers_map._run_pipeline()
-# df = suppliers_map.df_report
-# df_error = suppliers_map.df_errors
-# print(report.columns)
-print(df.loc[df['cwp'].str.contains('017'), ['cwp', 'cod_ativo']].drop_duplicates(keep='first'))
-# print(df)
-
-# df.to_excel(r"C:\Users\emman\OneDrive\Documentos\Pasta1.xlsx", index=False)
+df_capanema = lX_dir_capanema.get_report()
+df_error = lX_dir_capanema.get_erros()
+print(df_capanema.loc[df_capanema['tag'].str.contains('0042A'), ['file_name', 'supplier']].drop_duplicates(keep='first'))
+# print(df_error)
+# print(df_capanema)
