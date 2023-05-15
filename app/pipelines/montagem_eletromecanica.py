@@ -34,7 +34,6 @@ def newsteel():
     df_iwp = pipeline_tools._predict_stock(df_iwp, df_unknow_iwp)
     df_iwp = Reports._get_quantities(df_iwp.sort_values(by='data_inicio', ascending=True), df_recebimento.copy())
     df_iwp.to_parquet(os.path.join(output_dir, 'iwp_data.parquet'), index=False)
-    df_iwp.to_csv(os.path.join(output_dir, 'iwp_data.csv'), index=False)
     
     df_cwp = pd.merge(
         left=df_desenho,
@@ -59,7 +58,6 @@ def newsteel():
     df_cwp = Reports._get_quantities(df_cwp.sort_values(by='data_inicio', ascending=True), df_recebimento)
     
     df_cwp.to_parquet(os.path.join(output_dir, 'cwp_data.parquet'), index=False)
-    df_cwp.to_csv(os.path.join(output_dir, 'cwp_data.csv'), index=False)
 
 
 def capanema():
@@ -68,6 +66,7 @@ def capanema():
     summary = foundation.Summary(os.environ['SUMMARY_PATH_CAPANEMA'])
     masterplan = Masterplan(os.environ['MASTERPLAN_PATH_CAPANEMA'])
     lista_master = ListaMaster(os.environ['MASTERPLAN_PATH_CAPANEMA'])
+    suppliers_map = suppliers.SuppliersLX(os.environ['LX_PATH_CAPANEMA'], os.environ['MAPPER_PATH_CAPANEMA'])
 
     df_summary = summary.get_report()
     df_masterplan = masterplan.get_report()
@@ -75,6 +74,7 @@ def capanema():
     df_recebimento = reports.get_recebimento()
     df_desenho = reports.get_status_desenho()
     df_distribuicao = reports.get_distribuicao()
+    df_suppliers_map = suppliers_map.get_report()
 
     df_iwp = pd.merge(
         left=df_summary,
@@ -97,17 +97,32 @@ def capanema():
         how='left',
         suffixes=('_desenho', '_recebimento')
     )
+    
+    df_iwp = pd.merge(
+        df_iwp,
+        df_recebimento[['tag', 'peso_un', 'fornecedor']],
+        on='tag',
+        how='left',
+        suffixes=(None, '_recebimento')
+    )
+    df_iwp = pd.merge(
+        left=df_iwp,
+        right=df_suppliers_map,
+        on=['cwp', 'tag'],
+        how='left',
+        suffixes=(None, '_lx')
+    )
+    df_iwp['supplier'] = df_iwp['supplier'].fillna(df_iwp['fornecedor'])
     df_iwp.loc[df_iwp['peso_un_recebimento'].isna(), 'peso_un'] = df_iwp['peso_un_desenho']
     df_iwp.loc[df_iwp['peso_un'].isna(), 'peso_un'] = df_iwp['peso_un_recebimento']
     df_iwp.to_parquet(os.path.join(output_dir, 'iwp_data.parquet'), index=False)
-    df_iwp.to_csv(os.path.join(output_dir, 'iwp_data.csv'), index=False)
     
     df_cwp = pd.merge(
         left=df_desenho,
         right=df_summary[['cwp', 'data_inicio']].sort_values(by='data_inicio', ascending=True).drop_duplicates(subset=['cwp'], keep='first'),
         on=['cwp'],
         how='left',
-        suffixes=('_desenho', '_summary')
+        suffixes=(None, '_summary')
     )
 
     df_cwp = pd.merge(
@@ -135,12 +150,19 @@ def capanema():
     df_cwp = Reports._get_quantities(df_cwp.sort_values(by='data_inicio', ascending=True), df_recebimento)
     df_cwp = pd.merge(
         df_cwp,
-        df_recebimento[['tag', 'peso_un']],
+        df_recebimento[['tag', 'peso_un', 'fornecedor']],
         on='tag',
         how='left',
-        suffixes=('_desenho', '_recebimento')
+        suffixes=(None, '_recebimento')
     )
-    df_cwp.loc[df_cwp['peso_un_recebimento'].isna(), 'peso_un'] = df_cwp['peso_un_desenho']
+    df_cwp = pd.merge(
+        left=df_cwp,
+        right=df_suppliers_map,
+        on=['cwp', 'tag'],
+        how='left',
+        suffixes=(None, '_lx')
+    )
+    df_cwp['supplier'] = df_cwp['supplier'].fillna(df_cwp['fornecedor'])
     df_cwp.loc[df_cwp['peso_un'].isna(), 'peso_un'] = df_cwp['peso_un_recebimento']
+
     df_cwp.to_parquet(os.path.join(output_dir, 'cwp_data.parquet'), index=False)
-    df_cwp.to_csv(os.path.join(output_dir, 'cwp_data.csv'), index=False)

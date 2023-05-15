@@ -15,7 +15,7 @@ class Summary:
                             'IWP Planned Start Date', 
                             'IWP Planned Finish Date', 
                             'IWP Purpose',
-                            'Component Name',
+                            'HxGNBR_StringAttribute2',
                             'Component UID'
                         ]
                     )
@@ -34,7 +34,7 @@ class Summary:
             'IWP Planned Start Date': 'data_inicio', 
             'IWP Planned Finish Date': 'data_termino', 
             'IWP Purpose': 'proposito',
-            'Component Name': 'tag',
+            'HxGNBR_StringAttribute2': 'tag',
             'Component UID': 'guid' 
         })
         df = df.loc[df['proposito'].str.contains('Montagem', na=False)]

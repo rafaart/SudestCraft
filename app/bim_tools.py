@@ -26,7 +26,6 @@ class TracerFullReport():
 
     def _apply_order(self):
         df = self.df_raw_report
-        df = df.drop(columns=['order'])
         df['location_z'] = df['location_z'].astype(float)
         df = df.sort_values(by=['location_z', 'location_x'], ascending=[True, False])
         df_order = df.dropna(subset=['location_z', 'location_x'])
@@ -60,4 +59,23 @@ class IfcDataBase():
 
 
 
-            
+class Vcad():
+    def __init__(self, source_dir) -> None:
+        for item in os.listdir(source_dir):
+            if 'properties' in item:
+                item_path = os.path.join(source_dir, item)
+                self.df_raw = pd.read_csv(
+                    item_path,
+                    usecols=['objectId','name', 'value']
+                )
+
+    def _clean_report(self):
+        df = self.df_raw
+        df = df.loc[df['name'] == 'IfcGUID']
+        df = df.drop(columns=['name'])
+        df = df.rename(columns={'value': 'IfcId'})
+        self.df_report = df
+
+    def get_report(self):
+        self._clean_report()
+        return self.df_report

@@ -1,8 +1,9 @@
 import pandas as pd
 import os
+from openpyxl import load_workbook
 from datetime import datetime
 
-class PQ():
+class MemoriaCalculo():
     def __init__(self, source_dir) -> None:
         items = os.listdir(source_dir)
         m_dates = [os.path.getmtime(os.path.join(source_dir, item)) for item in items]
@@ -14,26 +15,35 @@ class PQ():
                         os.path.join(source_dir, item),
                         sheet_name='Geral - Verum OFICIAL',
                         skiprows=10,
-                        usecols=['CWP', 'QUANT. DETALHADO CORRIGIDA', 'UNID CORRIGIDA']
+                        usecols=['CWP', 'QUANT. DETALHADO CORRIGIDA', 'UNID CORRIGIDA', 'Fornecedor', 'K']
                     )
                 break
 
     def get_report(self):
-        return self.__class__._clean_report(self.df_scheduler)
+        self._clean_report()
+        return self.report
     
-    @staticmethod
-    def _clean_report(df):
+
+    def _clean_report(self):
+        df = self.df_scheduler
         df = df.rename(columns={
             'CWP': 'cwp', 
-            'QUANT. DETALHADO CORRIGIDA': 'peso_total_t',
-            'UNID CORRIGIDA': 'un'
+            'QUANT. DETALHADO CORRIGIDA': 'peso_capex_ton',
+            'UNID CORRIGIDA': 'un',
+            'Fornecedor': 'fornecedor',
+            'K': 'cod_atividade',
         })
+        df.loc[df['fornecedor'].str.contains('SINOSTEEL', na=False), 'fornecedor'] = 'SINOSTEEL'
+        df['fornecedor'] = df['fornecedor'].fillna('')
         df = df.loc[(df['un']=='t') | (df['un']=='kg')]
-        df = df.loc[pd.to_numeric(df['peso_total_t'], errors='coerce').notnull()]
-        df.loc[df['un']=='kg', 'peso_total_t'] = df['peso_total_t'] / 1000
-        df = df.groupby(by=['cwp'], as_index=False).sum(numeric_only=True)
-        df['peso_total_kg'] = df['peso_total_t'] * 1000
-        return df
+        df = df.loc[pd.to_numeric(df['peso_capex_ton'], errors='coerce').notnull()]
+        df.loc[df['un']=='kg', 'peso_capex_ton'] = df['peso_capex_ton'] / 1000
+        self.cwp_desmontagem = df.loc[df['cod_atividade'] == 'D']
+        df = df.loc[df['cod_atividade'] != 'D']
+        df = df.groupby(by=['cwp', 'fornecedor'], as_index=False).sum(numeric_only=True)
+        self.report = df
+        return self
+        
          
 
 class PQSimplified():
@@ -205,10 +215,8 @@ class CronogramaMasterConstrucap:
         df.loc[df['cwp'].str.contains('-CWPp'), 'atividade'] = 'pre-montagem'
         df.loc[df['cwp'].str.contains('-CWPm'), 'atividade'] = 'montagem'
         df['cwp'] = df['cwp'].str.split('-CWP').str[0] + '-CWP'
-
         df_min = df.loc[df.groupby('cwp', sort=False)['data_inicio'].idxmin()].drop(columns=['data_termino'])
         df_max = df.loc[df.groupby('cwp', sort=False)['data_termino'].idxmax(), ['cwp', 'data_termino']]
-        
         df = pd.merge(
             left=df_min,
             right=df_max,
@@ -441,7 +449,6 @@ class ProducaoFAM():
         df_categorical = df[categorical_columns].copy().drop_duplicates(subset='chave', keep='first')
 
         df = pd.merge(df_numeric, df_categorical, how='left', on='chave')
-
         df['total_sum'] = df[numeric_columns].sum(axis=1) - df['qtd_total']
         self.df_report = df
 
@@ -453,29 +460,27 @@ class ProducaoEMALTO():
                 if 'relatório de acompanhamento' in item.lower():
                     self.df_raw = pd.read_excel(
                         os.path.join(source_dir, item),
-                        skiprows=12,
-                        header=2,
+                        skiprows=1,
+                        header=0,
                         na_values=['(kg)', '~~~~~~~~~', ' '],
                         usecols=[
-                            'Fase', 
-                            'Marca', 
-                            'Quant.', 
-                            'Peso Total', 
-                            'Preparação', 
-                            'Montagem', 
-                            'Soldagem', 
-                            'Acabamento', 
-                            'Jateamento',
-                            'Pintura', 
-                            'Terceirização', 
-                            'Acessórios', 
-                            'Expedição',
-                            'Previsão de embarque',
+                            'FASE', 
+                            'MARCA', 
+                            'QTD', 
+                            'PESO TOTAL', 
+                            'PREPARAÇÃO', 
+                            'MONTAGEM', 
+                            'SOLDA', 
+                            'ACABAMENTO', 
+                            'JATO ',
+                            'PINTURA', 
+                            'EXPEDIÇÃO',
+                            'PREV EMBARQUE',
                         ]
                     )
                     break
         else:
-            raise ValueError("Data file not found")
+            raise ValueError("Relatório EMALTO não foi encontrado")
 
     def get_report(self):
         self._clean_report()
@@ -484,20 +489,18 @@ class ProducaoEMALTO():
     def _clean_report(self):
         df = self.df_raw
         df = df.rename(columns={
-            'Fase': 'cwa', 
-            'Marca': 'tag', 
-            'Quant.': 'qtd_total', 
-            'Peso Total': 'peso_total', 
-            'Preparação': 'peso_preparacao', 
-            'Montagem': 'peso_montagem', 
-            'Soldagem': 'peso_soldagem', 
-            'Acabamento': 'peso_acabamento', 
-            'Jateamento': 'peso_jateamento',
-            'Pintura': 'peso_pintura', 
-            'Terceirização': 'peso_terceirizacao', 
-            'Acessórios': 'peso_acessorios', 
-            'Expedição': 'peso_expedicao',
-            'Previsão de embarque': 'data_embarque',
+            'FASE': 'cwa', 
+            'MARCA': 'tag', 
+            'QTD': 'qtd_total', 
+            'PESO TOTAL': 'peso_total', 
+            'PREPARAÇÃO': 'peso_preparacao', 
+            'MONTAGEM': 'peso_montagem', 
+            'SOLDA': 'peso_soldagem', 
+            'ACABAMENTO': 'peso_acabamento', 
+            'JATO ': 'peso_jateamento',
+            'PINTURA': 'peso_pintura',
+            'EXPEDIÇÃO': 'peso_expedicao',
+            'PREV EMBARQUE': 'data_embarque',
         })
         numeric_columns = [
             'qtd_total', 
@@ -508,20 +511,23 @@ class ProducaoEMALTO():
             'peso_acabamento', 
             'peso_jateamento', 
             'peso_pintura', 
-            'peso_terceirizacao', 
-            'peso_acessorios', 
             'peso_expedicao'
         ]
         df = df.dropna(axis = 0, how = 'all')
         df = df.dropna(subset=['tag'])
+        df = df.loc[~df['tag'].str.contains('MARCA', na=False)]
+        df = df.loc[~df['tag'].str.contains('TOTAL', na=False)]
         df[numeric_columns] = df[numeric_columns].fillna(0.)
         df = df.fillna(method='ffill')
-        df['cwa'] = df['cwa'].str.split('-').str[1].str.replace(' ', '')
+        df['cwa'] = df['cwa'].str.split('CWA')
+        df['cwa'] = df['cwa'].str[1].str[:3]
+        df['cwa'] = df['cwa'].str.extract('(\d+)')
+        df['cwa'] = df['cwa'].str.zfill(3)
+        df['cwa'] = 'CWA'+df['cwa']
         df['cwa_number'] = df['cwa'].str.extract('(\d+)')
-        df['cwa_number'] = df['cwa_number'].str.zfill(3)
-        df['peso_un'] = df['peso_total'] / df['qtd_total']
+        df['peso_un'] = df['peso_total'].astype(float) / df['qtd_total'].astype(float)
         df['peso_programacao'] = df['peso_total'] - df['peso_preparacao']
-        df['peso_fabricacao'] = df[['peso_montagem', 'peso_soldagem', 'peso_acabamento', 'peso_jateamento', 'peso_pintura', 'peso_terceirizacao', 'peso_acessorios']].max(axis=1) - df['peso_expedicao']
+        df['peso_fabricacao'] = df[['peso_montagem', 'peso_soldagem', 'peso_acabamento', 'peso_jateamento', 'peso_pintura']].max(axis=1) - df['peso_expedicao']
         df['peso_preparacao'] = df['peso_preparacao'] - df['peso_fabricacao']
 
         df['qtd_programacao'] = df['peso_programacao'] / df['peso_un']
@@ -530,4 +536,48 @@ class ProducaoEMALTO():
         df['qtd_expedicao'] = df['peso_expedicao'] / df['peso_un']
 
         df[['qtd_programacao', 'qtd_preparacao', 'qtd_fabricacao', 'qtd_expedicao']] = df[['qtd_programacao', 'qtd_preparacao', 'qtd_fabricacao', 'qtd_expedicao']].round(0)
+        self.df_report = df
+
+
+class RomaneioEMALTO():
+    def __init__(self, source_dir) -> None:
+        self.workbooks = []
+        for item in os.listdir(source_dir):
+            if os.path.isfile(os.path.join(source_dir, item)):
+                if 'romaneio padrão vale' in item.lower():
+                    file_path=os.path.join(source_dir, item)
+                    wb = load_workbook(file_path, data_only=True)
+                    sh = wb["LTE"]
+                    cwa =sh["d5"].value
+                    
+                    workbook = pd.read_excel(
+                        file_path,
+                        skiprows=20,
+                        usecols=['COD. MATERIAL', 'QTD.'],
+                        dtype={'COD. MATERIAL':'object', 'QTD.':float}
+                    )
+                    workbook['cwa'] = cwa
+                    self.workbooks.append(workbook)
+        try:
+            self.df_raw = pd.concat(self.workbooks, axis=0, ignore_index=True) 
+        except:
+            raise ValueError("Source file not found")
+        
+        
+
+    def get_report(self):
+        self._clean_report()
+        return self.df_report
+    
+    def _clean_report(self):
+        df = self.df_raw
+        df = df.rename(columns={
+            'COD. MATERIAL': 'tag', 
+            'QTD.': 'qtd_romaneio',
+        })
+        df = df.dropna(subset=['tag'])
+        df = df.groupby(['cwa', 'tag'], as_index=False).sum()
+        df['cwa'] = df['cwa'].str.extract('(\d+)')
+        df['cwa'] = df['cwa'].str.zfill(3)
+        df['cwa'] = 'CWA'+df['cwa']
         self.df_report = df

@@ -117,7 +117,11 @@ def codeme(use_files=None):
 
 
 
-def sinosteel(input_ifc_folder, input_db_folder, output_folder, use_files=None):
+def sinosteel(use_files=None):
+    input_db_folder = os.environ['DB_PATH_CAPANEMA']
+    input_ifc_folder = os.environ['IFC_PATH_CAPANEMA']
+    output_folder = os.environ['STAGGING_PATH_CAPANEMA']
+
     print('Number of workers: ', num_workers)
     lx_capanema_dir = SuppliersLX(os.environ['LX_PATH_CAPANEMA'], os.environ['MAPPER_PATH_CAPANEMA'])
     df_lx = lx_capanema_dir.get_report()
@@ -133,6 +137,8 @@ def sinosteel(input_ifc_folder, input_db_folder, output_folder, use_files=None):
         print('Processing file: ', file_name.split('.')[0])
         db_file_path = os.path.join(input_db_folder, file_name)
         ifc_file_path = os.path.join(input_ifc_folder, file_name.replace('.db', '.ifc'))
+        print(db_file_path)
+        print(ifc_file_path)
         destination_file_path = os.path.join(output_folder, file_name.replace('.db', '.parquet'))
         
         ifc_data = IfcDataBase(db_file_path)
@@ -206,16 +212,12 @@ def famsteel(use_files=None):
     output_folder = os.environ['STAGGING_PATH_NEWSTEEL']
 
     print('Number of workers: ', num_workers)
-    lX_dir = SuppliersLX(os.environ['LX_PATH_NEWSTEEL'], os.environ['MAPPER_PATH_NEWSTEEL'])
-    df_lx = lX_dir.get_report()
-    df_lx = df_lx.loc[df_lx['supplier'] == 'FAM CONSTRUCOES']
-    df_lx = df_lx[['cwp', 'supplier']].drop_duplicates(subset='cwp', keep='first')
     files_names = os.listdir(input_db_folder)
     if use_files:
         use_files = use_files if isinstance(use_files, list) else [use_files]
         files_names = [file for file in files_names if file.split('.')[0] in use_files]
 
-    files_names = [name for name in files_names if name[0:25] in df_lx['cwp'].to_list()]
+    files_names = [name for name in files_names if 'VG-P0400' not in name]
     for file_name in files_names:
         print('Processing file: ', file_name.split('.')[0])
         db_file_path = os.path.join(input_db_folder, file_name)
@@ -226,7 +228,7 @@ def famsteel(use_files=None):
         df_elements = ifc_data.Element
         df_elements =  df_elements.loc[df_elements['Mesh'].str.len() > 30, ['IfcId', 'Mesh']]
         df_elements['file_name'] = os.path.basename(file_name).replace('.db', '')
-        df_elements['supplier'] = 'FAM CONSTRUCOES'
+        df_elements['supplier'] = 'FAM'
         df_elements['config'] = df_elements['supplier'].apply(lambda suppl: config[suppl])
         data_chunks = np.array_split(df_elements[['IfcId', 'config']], num_workers / 2)
 

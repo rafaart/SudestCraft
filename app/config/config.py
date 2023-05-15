@@ -1,10 +1,8 @@
-
 import os
-
 
 class Ifc():
     config = {
-        'FAM CONSTRUCOES':{
+        'FAM':{
             'geometry_settings': False,
             'params': {
                 'tag': ('Tekla Assembly', 'Assembly/Cast unit Mark'),
@@ -56,10 +54,13 @@ class Project():
         self.MONTADORA_PATH = self.REPOSITORY_PATH + r'\Cronogramas\Montadora'
         self.TRACER_PATH = self.REPOSITORY_PATH + r'\Modelos BIM\Stagging'
         self.PRODUCAO_PATH = self.REPOSITORY_PATH + r'\Status de Producao'
+        self.ROMANEIO_PATH = self.REPOSITORY_PATH + r'\Romaneio'
         self.PQ_PATH = self.REPOSITORY_PATH + r'\PQ'
-        self.IFC_PATH = self.REPOSITORY_PATH + r'\Modelos BIM\IFC Editados'
+        self.IFC_PATH = self.REPOSITORY_PATH + r'\Modelos BIM\IFC'
         self.DB_PATH = self.REPOSITORY_PATH + r'\Modelos BIM\DB Tracer'
         self.STAGGING_PATH = self.REPOSITORY_PATH + r'\Modelos BIM\Stagging'
+        self.FEDERATED_PATH = self.REPOSITORY_PATH + r'\Modelos BIM\IFC com status'
+        self.VCAD_PATH = self.REPOSITORY_PATH + r'\V Cad'
 
         self.OUTPUT_FAM = self.DASHBOARD_PATH + r'\Fornecimento\FAM Steel'
         self.OUTPUT_EMALTO = self.DASHBOARD_PATH + r'\Fornecimento\Emalto'
@@ -68,6 +69,7 @@ class Project():
         self.OUTPUT_MONTAGEM_ELETROMECANICA = self.DASHBOARD_PATH + r'\Montagem Eletromecanica'
         self.OUTPUT_GESTAO_MATERIAIS = self.DASHBOARD_PATH + r'\Gestão de Materiais'
         self.OUTPUT_ML_LX = self.DASHBOARD_PATH + r'\Checagem de LX'
+        
 
     def __repr__(self) -> str:
         return self.name

@@ -29,6 +29,7 @@ class Reports():
                         sep=';', 
                         index_col=False,
                         header=0,
+                        na_values=['  #VALUE! ', '  #DIV/0! '],
                         usecols=[' Nº LM', ' Tag/Código', ' Quantidade em BOM', ' Descrição', ' Peso Unit']
                     )
                 if 'distribuicao.csv' in item.lower():
@@ -63,7 +64,7 @@ class Reports():
         df['tag'] = df['tag'].str.replace(' ', '')
         df['tag'] = df['tag'].str.upper()
         df['cwp'] = df[' Nº LM'].str.replace(' ', '').str.split('/').str[-1]
-        df.loc[df['peso_un'] == '  #DIV/0! '] = 0
+        df['peso_un'] == df['peso_un'].fillna(0)
         df = df.drop(columns=[' Nº LM'])
         df = df.drop_duplicates(subset=['cwp', 'tag'])
         df[['tag', 'descricao', 'cwp']] = df[['tag', 'descricao', 'cwp']].applymap(lambda x: str(x))

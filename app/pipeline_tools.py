@@ -43,6 +43,24 @@ def get_quantities_fam(df, df_warehouse):
     return df
 
 
+def consume_warehouse(df, df_warehouse, column_warehouse, column_df):   
+    df[column_warehouse] = 0.
+    for idx, row in df.iterrows():
+        qtd_column_warehouse_value = df_warehouse.loc[df_warehouse['tag'] == row['tag'], column_warehouse]
+        if not qtd_column_warehouse_value.empty:
+            qtd_reference = row[column_df]
+            qtd_column_warehouse_value = qtd_column_warehouse_value.iloc[0]
+            if qtd_column_warehouse_value >= qtd_reference:
+                df.loc[idx, column_warehouse] = qtd_reference
+                df_warehouse.loc[df_warehouse['tag'] == row['tag'], column_warehouse] = qtd_column_warehouse_value - qtd_reference
+            else:
+                df.loc[idx, column_warehouse] = qtd_column_warehouse_value
+                df_warehouse.loc[df_warehouse['tag'] == row['tag'], column_warehouse] = 0.
+        else:
+            df.iloc[[idx]][column_warehouse] = 0
+    return df
+
+
 def get_quantities(df, df_warehouse):   
     df['qtd_recebida'] = 0
     for idx, row in df.iterrows():
@@ -62,8 +80,8 @@ def get_quantities(df, df_warehouse):
 
 
 def apply_status_emalto(row):
-    if (row['qtd_programacao'] + row['qtd_preparacao'] + row['qtd_fabricacao'] + row['qtd_expedicao']) < 1:
-        status = '5.Inconsistente'
+    if (row[['qtd_programacao','qtd_preparacao','qtd_fabricacao','qtd_expedicao','qtd_romaneio','qtd_recebida']].sum()) < 1:
+        status = '7.Inconsistente'
     elif row['order'] <= row['qtd_programacao']:
         status = '1.Programação'
     elif row['order'] <= row['qtd_programacao'] + row['qtd_preparacao']:
@@ -72,16 +90,18 @@ def apply_status_emalto(row):
         status = '3.Fabricação'
     elif row['order'] <= row['qtd_programacao'] + row['qtd_preparacao'] + row['qtd_fabricacao'] + row['qtd_expedicao']:
         status = '4.Expedição'
-    # elif row['order'] <= row['qtd_programacao'] + row['qtd_fabricacao'] + row['qtd_embarque'] + row['qtd_entregue'] + row['qtd_recebida']:
-    #     status = '5.Recebido VALE'
+    elif row['order'] <= row['qtd_programacao'] + row['qtd_preparacao'] + row['qtd_fabricacao'] + row['qtd_expedicao'] + row['qtd_romaneio']:
+        status = '5.Enviado EMALTO'
+    elif row['order'] <= row['qtd_programacao'] + row['qtd_preparacao'] + row['qtd_fabricacao'] + row['qtd_expedicao'] + row['qtd_romaneio'] + row['qtd_recebida']:
+        status = '6.Recebido Vale'
     else:
-        status = '5.Inconsistente'
+        status = '7.Inconsistente'
     return status
 
 
 
 def apply_status_fam(row):
-    if (row['qtd_programacao'] + row['qtd_fabricacao'] + row['qtd_embarque'] + row['qtd_entregue'] + row['qtd_recebida']) < 1:
+    if (row[['qtd_programacao','qtd_fabricacao','qtd_embarque','qtd_entregue','qtd_recebida']].sum()) < 1:
         status = '6.Inconsistente'
     elif row['order'] <= row['qtd_programacao']:
         status = '1.Programação'
