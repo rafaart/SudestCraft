@@ -8,7 +8,6 @@ from masterplan import Masterplan
 
 pd.options.mode.chained_assignment = None
 
-
 def famsteel():
     output_dir = os.environ['OUTPUT_FAM_NEWSTEEL']
 
@@ -64,8 +63,6 @@ def famsteel():
         suffixes=[None, '_romaneio']
     )
     df_tracer['status'] = df_tracer.apply(pipeline_tools.apply_status_fam, axis=1)
-    # df_tracer.loc[df_tracer['status'] == '6.Inconsistente', 'chave'] = 'CWA' + df_tracer['file_name']
-    # df_tracer = pipeline_tools.breakdown_by_axis(df_tracer, groupby='cwa_file', axis='elevation', n_parts=2)
     df_tracer.to_parquet(os.path.join(output_dir, 'tracer_data.parquet'), index=False)
     df.to_parquet(os.path.join(output_dir, 'inventory_data.parquet'), index=False)
 
@@ -108,9 +105,9 @@ def emalto():
         df_romaneio_only,
     ], axis=0)
 
-    df = pipeline_tools.consume_warehouse(df, df_romaneio, 'qtd_romaneio', 'qtd_total')
-    df = pipeline_tools.consume_warehouse(df, df_recebimento, 'qtd_recebida', 'qtd_total')
-
+    df, df_romaneio = pipeline_tools.consume_warehouse(df, 'qtd_total', df_romaneio, 'qtd_romaneio')
+    df, df_recebimento = pipeline_tools.consume_warehouse(df, 'qtd_total', df_recebimento, 'qtd_recebida')
+        
     df['peso_romaneio'] = df['qtd_romaneio'] * df['peso_un'] 
     df['peso_recebido'] = df['qtd_recebida'] * df['peso_un'] 
 
@@ -124,7 +121,7 @@ def emalto():
     df[peso_columns] = df[peso_columns].subtract(df['peso_romaneio'], axis=0)
     peso_columns += ['peso_romaneio']
     df[peso_columns] = df[peso_columns].subtract(df['peso_recebido'], axis=0)
-    df[peso_columns] = df[peso_columns].applymap(lambda x: 0 if x <0 else x)
+    df[peso_columns] = df[peso_columns].applymap(lambda x: 0 if x <0 else round(x, 3))
 
     df_fill  = df[['cwa_number']].drop_duplicates(keep='first')
     df = pd.concat([df, df_fill], ignore_index=True)
@@ -153,10 +150,11 @@ def codeme():
     output_dir = os.environ['OUTPUT_CODEME_CAPANEMA'] 
 
     masterplan = Masterplan(os.environ['MASTERPLAN_PATH_CAPANEMA'])
-    lx = suppliers.SuppliersLX(os.environ['LX_PATH_CAPANEMA'], os.environ['MAPPER_PATH_CAPANEMA'])
+    lx = suppliers.LX(os.environ['LX_PATH_CAPANEMA'])
     reports = Reports(os.environ['REPORTS_PATH_CAPANEMA'])
     tracer = TracerFullReport(os.environ['TRACER_PATH_CAPANEMA'])
     df_lx = lx.get_report()
+    df_lx['tag'] = df_lx['tag'].str.replace('1220CF01', '1220CF-01')
 
     df_numeric = df_lx[['cwp', 'tag', 'qtd_lx']].groupby(['cwp', 'tag'], as_index=False).sum(numeric_only=True)
     df_categorical = df_lx.drop(columns=['qtd_lx']).drop_duplicates(subset=['cwp', 'tag'], keep='first')
@@ -225,7 +223,7 @@ def sinosteel():
     output_dir = os.environ['OUTPUT_SINOSTEEL_CAPANEMA'] 
 
     masterplan = Masterplan(os.environ['MASTERPLAN_PATH_CAPANEMA'])
-    lx = suppliers.SuppliersLX(os.environ['LX_PATH_CAPANEMA'], os.environ['MAPPER_PATH_CAPANEMA'])
+    lx = suppliers.LX(os.environ['LX_PATH_CAPANEMA'])
     reports = Reports(os.environ['REPORTS_PATH_CAPANEMA'])
     tracer = TracerFullReport(os.environ['TRACER_PATH_CAPANEMA'])
     df_lx = lx.get_report()
@@ -258,11 +256,9 @@ def sinosteel():
     df_fill = df_main[['cwp', 'cod_navegacao']].drop_duplicates(subset=['cwp'], keep='first')
     df_fill['chave'] = df_fill['cwp']
     df_main = pd.concat([df_main,df_fill], ignore_index=True)
-   
     
     df_tracer = tracer.read_stagging_data().drop_missplaced_elements().get_report()
     df_tracer = df_tracer.loc[df_tracer['cwp'].isin(df_main['cwp'].drop_duplicates(keep='first'))]
-    # df_main = df_main.loc[df_main['cwp'].isin(df_tracer['cwp'].drop_duplicates(keep='first'))]
 
     df_tracer = df_tracer.loc[df_tracer['cwp'] == df_tracer['file_name'].str[0:25]]
     df_tracer = pd.merge(
@@ -276,6 +272,9 @@ def sinosteel():
     df_tracer.loc[~df_tracer['status'].isin(['1.Recebido', '2.Não entregue']), 'chave'] = df_tracer['cwp']
     df_tracer.loc[df_tracer['status'].isin(['1.Recebido', '2.Não entregue']), 'chave'] = df_tracer['cwp'] + "-" +df_tracer['tag']
     df_tracer = pipeline_tools.breakdown_by_axis(df_tracer, 'file_name', 'location_x', 2)
+    for file_name in df_tracer['file_name'].drop_duplicates(keep='first'):
+        if len(df_tracer.loc[df_tracer['file_name'] == file_name]) > 30000:
+            df_tracer.loc[df_tracer['file_name'] == file_name] = pipeline_tools.breakdown_by_axis(df_tracer.loc[df_tracer['file_name'] == file_name], 'file_name', 'location_x', 9)
     df_tracer = pipeline_tools.breakdown_by_file_count(df_tracer, 'cwp', 2)
 
     df_tracer.to_parquet(os.path.join(output_dir, 'tracer_data.parquet'), index=False)

@@ -17,7 +17,7 @@ class Ifc():
                 'fabricante': ('Tekla Assembly', 'USER_FIELD_2'),
             }
         },
-        'CODEME ENGENHARIA':{
+        'CODEME':{
             'geometry_settings': False,
             'params': {
                 'tag': ('Default', 'USER_FIELD_3'),
@@ -47,7 +47,8 @@ class Project():
         self.MEMORIA_CALCULO_PATH = os.path.dirname(os.environ['ROOT_PATH']) + r'\02.Prazo\Proj - Capanema\_Old\02. Cronograma AWP\Memória de Cálculo'
         self.REPORTS_PATH = self.PROJECT_PATH + r'\SMAT\REPORT'
         self.SUMMARY_PATH = self.REPOSITORY_PATH+ r'\Cronogramas\Summary'
-        self.LX_PATH = self.REPOSITORY_PATH + r'\LX\LX Geral'
+        self.LX_PATH = self.PROJECT_PATH + r'\SMAT\LX'
+        self.LX_REPOSITORY_PATH = self.REPOSITORY_PATH + r'\LX\LX Geral'
         self.MAPPER_PATH = self.REPOSITORY_PATH + r'\LX'
         self.MASTERPLAN_PATH = self.REPOSITORY_PATH + r'\Cronogramas\Masterplan'
         self.FORNECEDORES_PATH = self.REPOSITORY_PATH + r'\Cronogramas\Fornecedores'
@@ -60,7 +61,7 @@ class Project():
         self.DB_PATH = self.REPOSITORY_PATH + r'\Modelos BIM\DB Tracer'
         self.STAGGING_PATH = self.REPOSITORY_PATH + r'\Modelos BIM\Stagging'
         self.FEDERATED_PATH = self.REPOSITORY_PATH + r'\Modelos BIM\IFC com status'
-        self.VCAD_PATH = self.REPOSITORY_PATH + r'\V Cad'
+        self.VCAD_PATH = self.REPOSITORY_PATH + r'\VCad'
 
         self.OUTPUT_FAM = self.DASHBOARD_PATH + r'\Fornecimento\FAM Steel'
         self.OUTPUT_EMALTO = self.DASHBOARD_PATH + r'\Fornecimento\Emalto'
@@ -69,6 +70,7 @@ class Project():
         self.OUTPUT_MONTAGEM_ELETROMECANICA = self.DASHBOARD_PATH + r'\Montagem Eletromecanica'
         self.OUTPUT_GESTAO_MATERIAIS = self.DASHBOARD_PATH + r'\Gestão de Materiais'
         self.OUTPUT_ML_LX = self.DASHBOARD_PATH + r'\Checagem de LX'
+        self.OUTPUT_FEDERADO = self.DASHBOARD_PATH + r'\Modelo Federado'
         
 
     def __repr__(self) -> str:

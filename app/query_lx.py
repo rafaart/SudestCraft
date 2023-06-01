@@ -16,14 +16,14 @@ df_capanema = lX_dir_capanema.get_report()
 df_error = lX_dir_capanema.get_erros()
 print(df_capanema.columns)
 print(df_capanema.loc[
-    df_capanema['cwp'].str.contains('CF-S1985-001-M-MT-CWP-015')
+    df_capanema['tag'].str.contains('C2132')
 ])
 
 
 # df_newsteel = lX_dir_newsteel.get_report()
 # df_error = lX_dir_newsteel.get_erros()
-# print(df_capanema.columns)
-# print(df_capanema.loc[
-#     df_capanema['cwp'].str.contains('CF-S1985-006-S-MT-CWP-073'), 
-#     'tag'    
+# print(df_newsteel.columns)
+# print(df_newsteel.loc[
+#     df_newsteel['cwp'].str.contains('VG-P0400-036'), 
+#     ['file_name', 'cwp']    
 # ])

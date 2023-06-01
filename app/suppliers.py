@@ -72,6 +72,126 @@ class PQSimplified():
         return df
          
 
+class LX():
+    def __init__(self, source_dir, grouped_by_building=False) -> None:
+        self.source_dir = source_dir
+        self.grouped_by_building = grouped_by_building
+        self.config = {
+            'extensions': ['.xls', '.xlsx'],
+            'ignore':['.SUPERADOS', 'old'],
+            'depth':2
+        }
+
+    def get_report(self):
+        self._run_pipeline()
+        return self.df_lx
+
+    def get_erros(self):
+        self._run_pipeline()
+        return self.df_errors
+
+    def _run_pipeline(self):
+        self._map_files()
+        self._read_files()
+        self._clean_raw()
+
+    def _map_files(self):
+        def filter_dir(dir_path):
+            return dir_path[len(self.source_dir):].count(os.sep) > self.config['depth'] and all(term not in dir_path for term in self.config['ignore'])
+
+        def filter_files(file_name):
+            return any(ext in file_name for ext in self.config['extensions'])
+
+        mapped_dirs = [(root, files) for root, _, files in os.walk(self.source_dir) if filter_dir(root)]
+        self.mapped_files = [os.path.join(dir_path, file_name) for dir_path, files in mapped_dirs for file_name in files if filter_files(file_name)]
+
+        
+    def _read_files(self):
+        worksheets = []
+        df_errors = pd.DataFrame(columns=['file', 'sheet'])
+        for file_path in self.mapped_files:
+            try:
+                mod_date = os.path.getmtime(file_path)
+                workbook = pd.ExcelFile(file_path)
+                for sheet in workbook.sheet_names:
+                    if 'rosto' in sheet.lower():
+                        worksheet = workbook.parse(
+                            sheet,
+                            skiprows=2,
+                        )
+                        rev = worksheet.iloc[4,13]
+                        cod_vale = worksheet.iloc[4,9]
+                        if 'LX' not in str(cod_vale):
+                            cod_vale = worksheet.iloc[0,9]
+                            if 'CF' not in str(cod_vale) and 'LX' not in str(cod_vale):
+                                cod_vale = worksheet.iloc[0,10]
+                                if 'CF' not in str(cod_vale) and 'LX' not in str(cod_vale):
+                                    cod_vale = worksheet.iloc[0,12]
+                    if 'rosto' not in sheet.lower():
+                        try:
+                            worksheet = workbook.parse(
+                                sheet,
+                                skiprows=2,
+                                na_values=[' ', 'D', '-'],
+                                usecols=['CWP', 'PESO UNIT(KG)', 'CÓDIGO DO MATERIAL (SKU)', 'QTDE', 'DESCRIÇÃO COMPLETA', 'OBS', 'TAG DA REFERÊNCIA'],
+                                converters={
+                                    'CWP': str, 
+                                    'CÓDIGO DO MATERIAL (SKU)': str, 
+                                    'DESCRIÇÃO COMPLETA': str,  
+                                    'OBS': str,  
+                                    'TAG DA REFERÊNCIA': str,
+                                    'PESO UNIT(KG)': str,
+                                }
+                            )
+                            worksheet['supplier'] = file_path[len(self.source_dir):].split(os.sep)[1]
+                            worksheet['rev'] = str(rev)
+                            worksheet['cod_vale'] = cod_vale
+                            worksheet['sheet_name'] = sheet
+                            worksheet['file_name'] = os.path.basename(file_path)
+                            worksheet['file_path'] = file_path
+                            worksheet['last_mod_date'] = datetime.fromtimestamp(mod_date).strftime('%Y-%m-%d %H:%M:%S')
+                            worksheets.append(worksheet)
+                        except:
+                            row = pd.DataFrame({'file': [os.path.basename(file_path)], 'sheet': [sheet]})
+                            df_errors = pd.concat([df_errors, row], axis=0, ignore_index=True)          
+            except Exception as e:
+                row = pd.DataFrame({'file': [os.path.basename(file_path)], 'sheet': None})
+                df_errors = pd.concat([df_errors, row], axis=0, ignore_index=True)                
+        self.df_raw = pd.concat(worksheets, axis=0, ignore_index=True)
+        self.df_errors = df_errors
+
+    def _clean_raw(self):
+        df = self.df_raw
+        df = df.rename(columns={
+            'CWP': 'cwp',
+            'TAG DA REFERÊNCIA': 'cod_ativo',
+            'CÓDIGO DO MATERIAL (SKU)': 'tag',
+            'DESCRIÇÃO COMPLETA': 'descricao',
+            'QTDE': 'qtd_lx', 
+            'PESO UNIT(KG)': 'peso_un',
+            'OBS': 'obs'
+        })
+        df = df.dropna(subset=['cwp', 'tag', 'qtd_lx'])
+        df['cwp'] = df['cwp'].str.replace(' ', '')
+        df['tag'] = df['tag'].str.replace(' ', '')
+        
+        df.loc[~df['obs'].str.contains('NÃO MODELAD', na=False), 'geometry'] = True
+        df.loc[df['obs'].str.contains('NÃO MODELAD', na=False), 'geometry'] = False
+
+        df['cwp_number'] = df['cwp'].str.split('-').str[-1]
+        df['chave'] = df['cwp_number'].str.zfill(3) + '-' + df['tag']
+        df.loc[df['peso_un'].str.contains(',', na=False, regex=False), 'peso_un'] = df['peso_un'].str.replace('.', '').str.replace(',', '.')
+        df['peso_un'] = df['peso_un'].apply(lambda x: 0 if '-' in str(x) else float(x))
+        df['qtd_lx'] = df['qtd_lx'].astype(float)
+
+        keys = ['cwp', 'cod_ativo', 'tag'] if self.grouped_by_building else ['cwp', 'tag']
+        df_numeric = df[keys + ['qtd_lx']].groupby(by=keys, as_index=False).sum(numeric_only=True).round(0)
+        df_categorical = df.copy().drop(columns=['qtd_lx']).drop_duplicates(subset=keys, keep='first')
+        df = pd.merge(df_numeric, df_categorical, how='left', on=keys)
+        df = df.sort_values(by=['rev'], ascending=False).drop_duplicates(subset=['cod_vale', 'cwp', 'tag'], keep='first')
+
+        self.df_lx = df
+
 
 class SuppliersLX():
     def __init__(self, source_dir, mapper_dir, grouped_by_building=False) -> None:
@@ -131,6 +251,7 @@ class SuppliersLX():
                                 worksheet = workbook.parse(
                                     sheet,
                                     skiprows=2,
+                                    na_values=[' ', 'D'],
                                     usecols=['CWP', 'PESO UNIT(KG)', 'CÓDIGO DO MATERIAL (SKU)', 'QTDE', 'DESCRIÇÃO COMPLETA', 'OBS', 'TAG DA REFERÊNCIA'],
                                     converters={
                                         'CWP': str, 
@@ -141,7 +262,7 @@ class SuppliersLX():
                                     }
                                 )
                                 worksheet['sheet_name'] = sheet
-                                worksheet['file_name'] = item.split('.')[0]
+                                worksheet['file_name'] = item.split('_')[0]
                                 worksheet['last_mod_date'] = datetime.fromtimestamp(mod_date).strftime('%Y-%m-%d %H:%M:%S')
                                 worksheets.append(worksheet)
                             except:
@@ -526,9 +647,9 @@ class ProducaoEMALTO():
         df['cwa'] = 'CWA'+df['cwa']
         df['cwa_number'] = df['cwa'].str.extract('(\d+)')
         df['peso_un'] = df['peso_total'].astype(float) / df['qtd_total'].astype(float)
-        df['peso_programacao'] = df['peso_total'] - df['peso_preparacao']
         df['peso_fabricacao'] = df[['peso_montagem', 'peso_soldagem', 'peso_acabamento', 'peso_jateamento', 'peso_pintura']].max(axis=1) - df['peso_expedicao']
-        df['peso_preparacao'] = df['peso_preparacao'] - df['peso_fabricacao']
+        df['peso_preparacao'] = df['peso_preparacao'] - df['peso_fabricacao'] - df['peso_expedicao']
+        df['peso_programacao'] = df['peso_total'] - df['peso_preparacao'] - df['peso_fabricacao'] - df['peso_expedicao']
 
         df['qtd_programacao'] = df['peso_programacao'] / df['peso_un']
         df['qtd_preparacao'] = df['peso_preparacao'] / df['peso_un']
@@ -545,23 +666,26 @@ class RomaneioEMALTO():
         for item in os.listdir(source_dir):
             if os.path.isfile(os.path.join(source_dir, item)):
                 if 'romaneio padrão vale' in item.lower():
-                    file_path=os.path.join(source_dir, item)
-                    wb = load_workbook(file_path, data_only=True)
-                    sh = wb["LTE"]
-                    cwa =sh["d5"].value
-                    
-                    workbook = pd.read_excel(
-                        file_path,
-                        skiprows=20,
-                        usecols=['COD. MATERIAL', 'QTD.'],
-                        dtype={'COD. MATERIAL':'object', 'QTD.':float}
-                    )
-                    workbook['cwa'] = cwa
-                    self.workbooks.append(workbook)
+                    try:
+                        file_path=os.path.join(source_dir, item)
+                        wb = load_workbook(file_path, data_only=True)
+                        sh = wb["LTE"]
+                        cwa =sh["d5"].value
+                        
+                        workbook = pd.read_excel(
+                            file_path,
+                            skiprows=20,
+                            usecols=['COD. MATERIAL', 'QTD.'],
+                            dtype={'COD. MATERIAL':'object', 'QTD.':float}
+                        )
+                        workbook['cwa'] = cwa
+                        self.workbooks.append(workbook)
+                    except:
+                        raise OSError(f"Unable to read file: {item}")
         try:
             self.df_raw = pd.concat(self.workbooks, axis=0, ignore_index=True) 
         except:
-            raise ValueError("Source file not found")
+            raise FileNotFoundError("Source file not found")
         
         
 

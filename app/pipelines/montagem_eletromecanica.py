@@ -66,7 +66,7 @@ def capanema():
     summary = foundation.Summary(os.environ['SUMMARY_PATH_CAPANEMA'])
     masterplan = Masterplan(os.environ['MASTERPLAN_PATH_CAPANEMA'])
     lista_master = ListaMaster(os.environ['MASTERPLAN_PATH_CAPANEMA'])
-    suppliers_map = suppliers.SuppliersLX(os.environ['LX_PATH_CAPANEMA'], os.environ['MAPPER_PATH_CAPANEMA'])
+    lx = suppliers.LX(os.environ['LX_PATH_CAPANEMA'])
 
     df_summary = summary.get_report()
     df_masterplan = masterplan.get_report()
@@ -74,7 +74,7 @@ def capanema():
     df_recebimento = reports.get_recebimento()
     df_desenho = reports.get_status_desenho()
     df_distribuicao = reports.get_distribuicao()
-    df_suppliers_map = suppliers_map.get_report()
+    df_lx = lx.get_report()
 
     df_iwp = pd.merge(
         left=df_summary,
@@ -107,7 +107,7 @@ def capanema():
     )
     df_iwp = pd.merge(
         left=df_iwp,
-        right=df_suppliers_map,
+        right=df_lx,
         on=['cwp', 'tag'],
         how='left',
         suffixes=(None, '_lx')
@@ -157,7 +157,7 @@ def capanema():
     )
     df_cwp = pd.merge(
         left=df_cwp,
-        right=df_suppliers_map,
+        right=df_lx,
         on=['cwp', 'tag'],
         how='left',
         suffixes=(None, '_lx')

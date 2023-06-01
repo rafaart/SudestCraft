@@ -69,6 +69,11 @@ class Reports():
         df = df.drop_duplicates(subset=['cwp', 'tag'])
         df[['tag', 'descricao', 'cwp']] = df[['tag', 'descricao', 'cwp']].applymap(lambda x: str(x))
         df['peso_un'] = df['peso_un'].apply(lambda x: float(x))
+
+        ########################################################################################
+        df = df.loc[~df['cwp'].str.contains('VG-P0400-022-S-MT-0101.01-CWP-EMALTO', na=False)]
+        df = df.loc[~df['cwp'].str.contains('VG-P0400-115-S-MT-0283.01-CWP-EMALTO ', na=False)]
+        ########################################################################################
         return df
 
     @staticmethod

@@ -43,22 +43,31 @@ def get_quantities_fam(df, df_warehouse):
     return df
 
 
-def consume_warehouse(df, df_warehouse, column_warehouse, column_df):   
+def consume_warehouse(df, column_df, df_warehouse, column_warehouse): 
+    df = df.reset_index(drop=True)
     df[column_warehouse] = 0.
-    for idx, row in df.iterrows():
-        qtd_column_warehouse_value = df_warehouse.loc[df_warehouse['tag'] == row['tag'], column_warehouse]
-        if not qtd_column_warehouse_value.empty:
-            qtd_reference = row[column_df]
-            qtd_column_warehouse_value = qtd_column_warehouse_value.iloc[0]
-            if qtd_column_warehouse_value >= qtd_reference:
-                df.loc[idx, column_warehouse] = qtd_reference
-                df_warehouse.loc[df_warehouse['tag'] == row['tag'], column_warehouse] = qtd_column_warehouse_value - qtd_reference
-            else:
-                df.loc[idx, column_warehouse] = qtd_column_warehouse_value
-                df_warehouse.loc[df_warehouse['tag'] == row['tag'], column_warehouse] = 0.
+    consumer = df[['tag', column_df, column_warehouse]].to_dict(orient='records')
+    warehouse = df_warehouse.set_index('tag').to_dict()[column_warehouse]
+    for row in consumer:
+        try:
+            qtd_warehouse_value = warehouse[row['tag']]
+        except:
+            warehouse[row['tag']] = qtd_warehouse_value = 0
+        if qtd_warehouse_value >= row[column_df]:
+            row[column_warehouse] = row[column_df]
+            warehouse[row['tag']] = qtd_warehouse_value - row[column_df]
         else:
-            df.iloc[[idx]][column_warehouse] = 0
-    return df
+            row[column_warehouse] = warehouse[row['tag']]
+            warehouse[row['tag']] = 0.
+
+    df = pd.concat([
+        df.drop(columns=[column_df, column_warehouse]),
+        pd.DataFrame(consumer).drop(columns=['tag']),
+    ], axis=1)
+
+    df_warehouse = pd.DataFrame(warehouse.items(), columns=['tag', column_warehouse])
+    return df, df_warehouse
+
 
 
 def get_quantities(df, df_warehouse):   

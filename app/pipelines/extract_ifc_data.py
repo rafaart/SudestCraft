@@ -10,6 +10,7 @@ import multiprocessing as mp
 import time
 import sys
 import itertools
+import json
 
 
 config = Ifc.config
@@ -31,7 +32,7 @@ def _get_colors(geometry_settings, element):
 
 def _params_by_id(row, ifc, geometry_settings):
     guid = row['IfcId']
-    config = row['config']
+    config = json.loads(row['config'])
     geometry_settings = geometry_settings if config['geometry_settings'] else None
     config = config['params']
     element = ifc.by_guid(guid)
@@ -79,7 +80,8 @@ def codeme(use_files=None):
     print('Number of workers: ', num_workers)
     lx_capanema_dir = SuppliersLX(os.environ['LX_PATH_CAPANEMA'], os.environ['MAPPER_PATH_CAPANEMA'])
     df_lx = lx_capanema_dir.get_report()
-    df_lx = df_lx.loc[df_lx['supplier'] == 'CODEME ENGENHARIA']
+    df_lx = df_lx.loc[df_lx['supplier'] == 'CODEME']
+    
     df_lx = df_lx[['cwp', 'supplier']].drop_duplicates(subset='cwp', keep='first')
     files_names = os.listdir(input_db_folder)
     if use_files:
@@ -97,8 +99,8 @@ def codeme(use_files=None):
         df_elements = ifc_data.Element
         df_elements =  df_elements.loc[df_elements['Mesh'].str.len() > 30, ['IfcId', 'Mesh']]
         df_elements['file_name'] = os.path.basename(file_name).replace('.db', '')
-        df_elements['supplier'] = 'CODEME ENGENHARIA'
-        df_elements['config'] = df_elements['supplier'].apply(lambda suppl: config[suppl])
+        df_elements['supplier'] = 'CODEME'
+        df_elements['config'] = json.dumps(config['CODEME'])
         data_chunks = np.array_split(df_elements[['IfcId', 'config']], num_workers / 2)
 
         with mp.Pool(processes=num_workers) as pool:
@@ -137,8 +139,6 @@ def sinosteel(use_files=None):
         print('Processing file: ', file_name.split('.')[0])
         db_file_path = os.path.join(input_db_folder, file_name)
         ifc_file_path = os.path.join(input_ifc_folder, file_name.replace('.db', '.ifc'))
-        print(db_file_path)
-        print(ifc_file_path)
         destination_file_path = os.path.join(output_folder, file_name.replace('.db', '.parquet'))
         
         ifc_data = IfcDataBase(db_file_path)
@@ -146,7 +146,7 @@ def sinosteel(use_files=None):
         df_elements =  df_elements.loc[df_elements['Mesh'].str.len() > 30, ['IfcId', 'Mesh']]
         df_elements['file_name'] = os.path.basename(file_name).replace('.db', '')
         df_elements['supplier'] = 'SINOSTEEL'
-        df_elements['config'] = df_elements['supplier'].apply(lambda suppl: config[suppl])
+        df_elements['config'] = json.dumps(config['SINOSTEEL'])
         data_chunks = np.array_split(df_elements[['IfcId', 'config']], num_workers / 2)
 
         with mp.Pool(processes=num_workers) as pool:

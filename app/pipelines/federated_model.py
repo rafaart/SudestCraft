@@ -10,6 +10,7 @@ import ifcopenshell.api
 
 pd.options.mode.chained_assignment = None
 
+
 def capanema():
     output_dir = os.environ['FEDERATED_PATH_CAPANEMA']
     ifc_dir = os.environ['IFC_PATH_CAPANEMA']
@@ -79,7 +80,7 @@ def capanema():
 
 
 def vcad():
-    output_dir = os.environ['OUTPUT_CODEME_CAPANEMA'] 
+    output_dir = os.environ['OUTPUT_FEDERADO_CAPANEMA'] 
 
     masterplan = Masterplan(os.environ['MASTERPLAN_PATH_CAPANEMA'])
     lx = suppliers.SuppliersLX(os.environ['LX_PATH_CAPANEMA'], os.environ['MAPPER_PATH_CAPANEMA'])
@@ -92,7 +93,7 @@ def vcad():
     df_numeric = df_lx[['cwp', 'tag', 'qtd_lx']].groupby(['cwp', 'tag'], as_index=False).sum(numeric_only=True)
     df_categorical = df_lx.drop(columns=['qtd_lx']).drop_duplicates(subset=['cwp', 'tag'], keep='first')
     df_lx = pd.merge(df_numeric, df_categorical, how='left', on=['cwp', 'tag'])
-    df_lx = df_lx.loc[df_lx['supplier'].str.contains('CODEME', na=False)]
+    df_lx = df_lx.loc[df_lx['supplier'].str.contains('CODEME', na=False) | df_lx['supplier'].str.contains('SINOSTEEL', na=False)]
 
     df_main = pd.merge(
         left=df_lx,
@@ -138,8 +139,9 @@ def vcad():
     df_vcad = vcad.get_report()
     df = pd.merge(
         df_vcad,
-        df_tracer[['IfcId', 'file_name', 'supplier', 'name', 'tag', 'cwp', 'cod_ativo', 'qtd_recebida', 'status']],
+        df_tracer[['IfcId', 'file_name', 'supplier', 'name', 'tag', 'cwp', 'cod_ativo', 'qtd_recebida', 'status', 'agg_id']],
         on='IfcId',
         how='left'
     )
-    df.to_parquet(r'C:\Users\emman\VERUM PARTNERS\VERUM PARTNERS - VAL2018021\00.TI\Proj - Capanema\BI\01. Dashboards Ativos\Modelo Federado\vcad.parquet', index=False)
+
+    df.to_parquet(os.path.join(output_dir, 'vcad.parquet'), index=False)

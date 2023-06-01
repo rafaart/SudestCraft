@@ -13,7 +13,7 @@ def newsteel():
     fam_mining = suppliers.FamMining(os.environ['FORNECEDORES_PATH_NEWSTEEL'])
     fam_structure = suppliers.FamStructure(os.environ['FORNECEDORES_PATH_NEWSTEEL'])
     pq = suppliers.PQSimplified(os.environ['PQ_PATH_NEWSTEEL'])
-    suppliers_map = suppliers.SuppliersLX(os.environ['LX_PATH_NEWSTEEL'], os.environ['MAPPER_PATH_NEWSTEEL'])
+    lx = suppliers.LX(os.environ['LX_PATH_CAPANEMA'])
     reports = Reports(os.environ['REPORTS_PATH_NEWSTEEL'])
 
     df_construcap = construcap.get_report()
@@ -23,7 +23,7 @@ def newsteel():
     df_pq = pq.get_report()
     df_desenho = reports.get_status_desenho()
     df_recebimento = reports.get_recebimento()
-    df_suppliers_map = suppliers_map.get_report()
+    df_lx = lx.get_report()
 
     df_suppliers = pd.concat([df_aumond, df_fam_mining, df_fam_structure])
     df_suppliers = df_suppliers.sort_values(by='data_termino', ascending=True).drop_duplicates(subset='cwp' ,keep='last')
@@ -49,18 +49,15 @@ def newsteel():
         on='cwp',
         how='outer',
         suffixes=('_cronograma', '_desenho')
-    )
-    
+    )  
     df_main = pd.merge(
         left=df_main,
-        right=df_suppliers_map,
+        right=df_lx[['cwp', 'tag', 'supplier', 'qtd_lx', 'peso_un']],
         on=['cwp', 'tag'],
         how='left',
         suffixes=(None, '_lx')
     )
-
     df_main = Reports._get_quantities(df_main, df_recebimento)
-    df_main = df_main.drop(columns=['obs'])
     df_main = pd.merge(
         df_main,
         df_recebimento[['tag', 'peso_un', 'fornecedor']],
@@ -80,7 +77,7 @@ def capanema():
 
     reports = Reports(source_dir=os.environ['REPORTS_PATH_CAPANEMA'])
     memoria_calculo = suppliers.MemoriaCalculo(os.environ['MEMORIA_CALCULO_PATH_CAPANEMA'])
-    suppliers_map = suppliers.SuppliersLX(os.environ['LX_PATH_CAPANEMA'], os.environ['MAPPER_PATH_CAPANEMA'])
+    lx = suppliers.LX(os.environ['LX_PATH_CAPANEMA'])
     masterplan = Masterplan(os.environ['MASTERPLAN_PATH_CAPANEMA'])
 
     flsmidth = suppliers.ModeloCronogramaCapanema('flsmidth', os.environ['FORNECEDORES_PATH_CAPANEMA'])
@@ -103,7 +100,7 @@ def capanema():
     df_masterplan = masterplan.get_report()
     df_desenho = reports.get_status_desenho()
     df_recebimento = reports.get_recebimento()
-    df_suppliers_map = suppliers_map.get_report()
+    df_lx = lx.get_report()
 
     memoria_calculo._clean_report()
     df_memoria = memoria_calculo.report
@@ -132,7 +129,7 @@ def capanema():
     )
     df_main = pd.merge(
         left=df_main,
-        right=df_suppliers_map,
+        right=df_lx[['cwp', 'tag', 'supplier', 'qtd_lx', 'peso_un']],
         on=['cwp', 'tag'],
         how='left',
         suffixes=(None, '_lx')
