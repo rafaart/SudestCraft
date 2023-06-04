@@ -395,7 +395,6 @@ class Cardan():
             'CWP': 'cwp', 
             'Data de início CWP  - Real / Tendência  Construtora': 'data_inicio',
             'Data de término CWP  - Real / Tendência  Construtora': 'data_termino',
-            
         })
         df.loc[~df['cwp'].str.contains('-CWP'), 'cwp'] = df['cwp'] + '-CWP'
         return df

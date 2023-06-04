@@ -18,9 +18,9 @@ if __name__ == "__main__":
     # bim_x_pwp.emalto()
     # bim_x_pwp.famsteel()
 
-    # montagem_eletromecanica.capanema()
-    # gestao_materiais.capanema()
-    # bim_x_pwp.codeme()
+    montagem_eletromecanica.capanema()
+    gestao_materiais.capanema()
+    bim_x_pwp.codeme()
     bim_x_pwp.sinosteel()
     # federated_model.capanema()  
     # federated_model.vcad()      

@@ -71,7 +71,6 @@ def _process_data_chunk(ifc_path, df_data_chunk):
 
 
 
-
 def codeme(use_files=None):
     input_db_folder = os.environ['DB_PATH_CAPANEMA']
     input_ifc_folder = os.environ['IFC_PATH_CAPANEMA']

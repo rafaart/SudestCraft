@@ -1,6 +1,7 @@
 import pandas as pd
 import os
 
+    
 class Summary:
     def __init__(self, source_dir) -> None:
         for item in os.listdir(source_dir):
@@ -42,7 +43,6 @@ class Summary:
         df = df.dropna(subset='tag')
         df = df.drop_duplicates(subset=['guid', 'tag'], keep='first')     
                
-        # df['iwp'] = df['iwp'].str.replace('-COM', '')
         df['cwp'] = df['iwp'].str.split('.').str[:-1].str.join('.')
         df['cwa'] = df['iwp'].str.split('-').str[2]     
 
@@ -56,3 +56,4 @@ class Summary:
             how='inner'
         )
         return df
+    

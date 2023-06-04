@@ -153,7 +153,10 @@ def codeme():
     lx = suppliers.LX(os.environ['LX_PATH_CAPANEMA'])
     reports = Reports(os.environ['REPORTS_PATH_CAPANEMA'])
     tracer = TracerFullReport(os.environ['TRACER_PATH_CAPANEMA'])
-    df_lx = lx.get_report()
+
+    lx._run_pipeline()
+    print(lx.df_errors)
+    df_lx = lx.df_lx
     df_lx['tag'] = df_lx['tag'].str.replace('1220CF01', '1220CF-01')
 
     df_numeric = df_lx[['cwp', 'tag', 'qtd_lx']].groupby(['cwp', 'tag'], as_index=False).sum(numeric_only=True)
