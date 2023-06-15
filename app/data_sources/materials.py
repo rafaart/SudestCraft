@@ -1,21 +1,20 @@
 import pandas as pd
 import os
+import numpy as np
 import json
 
 class Reports():
-    suppliers_map = [
-        'SEMCO',
-        'ICON',
-        'RAND',
-        'FAMSTEEL',
-        'HAVER'
+    project_prefix = [
+        'CF-S1985',
+        'VG-P0400',
     ]
     def __init__(self, source_dir=r'C:\Users\EmmanuelSantana\VERUM PARTNERS\VERUM PARTNERS - VAL2018021\00.TI\Proj - Capanema\BI\Arquivo\Report') -> None:
         for item in os.listdir(source_dir):
             if os.path.isfile(os.path.join(source_dir, item)):
+                file_path = os.path.join(source_dir, item)
                 if 'recebimento.csv' in item.lower():
                     self.df_recebimento = pd.read_csv(
-                        os.path.join(source_dir, item),
+                        file_path,
                         encoding = 'ANSI',
                         sep=';', 
                         index_col=False,
@@ -24,37 +23,42 @@ class Reports():
                     )
                 if 'desenho.csv' in item.lower():
                     self.df_desenho = pd.read_csv(
-                        os.path.join(source_dir, item),
+                        file_path,
                         encoding = 'ANSI',
                         sep=';', 
                         index_col=False,
                         header=0,
                         na_values=['  #VALUE! ', '  #DIV/0! '],
-                        usecols=[' Nº LM', ' Tag/Código', ' Quantidade em BOM', ' Descrição', ' Peso Unit']
+                        usecols=[' Nº LM', ' Tag/Código', ' Quantidade em BOM', ' Descrição', ' Peso Unit'],
+                        dtype={' Quantidade em BOM':float, ' Peso Unit':float}
                     )
                 if 'distribuicao.csv' in item.lower():
                     self.df_distribuicao = pd.read_csv(
-                        os.path.join(source_dir, item),
+                        file_path,
                         encoding = 'ANSI',
                         sep=';', 
                         index_col=False,
                         header=0,
+                        na_values=[' / '],
                         usecols=[' DOC REF (ITEM) ', ' CONTRATADA ', ' RESERVA/RODADA ', ' TAG ', ' QT SOLICITADA ', ' QT ENTREGUE ', ' COMENTÁRIOS ']
-                    )
-                
+                    )   
+        for prop in  ['df_recebimento', 'df_desenho', 'df_distribuicao']:
+            missing_reports = []
+            try:
+                getattr(self, prop) 
+            except:
+                missing_reports.append(prop)
+        if missing_reports:
+            raise FileNotFoundError(f'The files where not found to generate the following tables: {missing_reports}')
 
-    def get_status_desenho(self):
-        return self.__class__._clean_status_desenho(self.df_desenho)
-
-    def get_recebimento(self):
-        return self.__class__._clean_recebimento(self.df_recebimento)
-
-    def get_distribuicao(self):
-        return self.__class__._clean_distribuicao(self.df_distribuicao)
+    def clean_reports(self):
+        self._clean_status_desenho()
+        self._clean_recebimento()
+        self._clean_distribuicao()
 
 
-    @staticmethod
-    def _clean_status_desenho(df):
+    def _clean_status_desenho(self):
+        df = self.df_desenho
         df = df.rename(columns={
             ' Tag/Código': 'tag', 
             ' Quantidade em BOM': 'qtd_desenho',
@@ -74,10 +78,10 @@ class Reports():
         df = df.loc[~df['cwp'].str.contains('VG-P0400-022-S-MT-0101.01-CWP-EMALTO', na=False)]
         df = df.loc[~df['cwp'].str.contains('VG-P0400-115-S-MT-0283.01-CWP-EMALTO ', na=False)]
         ########################################################################################
-        return df
+        self.df_desenho = df
 
-    @staticmethod
-    def _clean_recebimento(df):
+    def _clean_recebimento(self):
+        df = self.df_recebimento
         df = df.rename(columns={
             ' TAG/CÓDIGO ': 'tag', 
             ' QT RECEBIDA ': 'qtd_recebida', 
@@ -96,10 +100,31 @@ class Reports():
             on='tag',
             how='left'
         )
-        return df
+        self.df_recebimento = df
 
-    @staticmethod
-    def _clean_distribuicao(df):
+    def _clean_distribuicao(self):
+        def extract_iwp(comment):
+            for string_slice in comment.split(' '):
+                if any(prefix in string_slice for prefix in self.project_prefix):
+                    sub_slices = string_slice.split('CWP')
+                    count=0
+                    flag_alpha=False
+                    for char in sub_slices[-1][1:]:
+                        if char.isalpha():
+                            if flag_alpha:
+                                break
+                            else:
+                                flag_alpha = True
+                        else:
+                            if any(char == special_char for special_char in '(|) '):
+                                break
+                        count+=1
+                    sub_slices[-1] = sub_slices[-1][:count + 1]
+                    string_slice = 'CWP'.join(sub_slices)
+                    return string_slice
+            return np.nan
+
+        df = self.df_distribuicao
         df = df.rename(columns={
             ' DOC REF (ITEM) ': 'cwp',
             ' CONTRATADA ': 'contratada', 
@@ -111,8 +136,17 @@ class Reports():
         })
         df['iwp'] = df['iwp']\
             .str.split('/').str[0]\
-            .str.split('CWP.').str[-1]
-        
+            .str.replace(' ', '')
+        df_iwp = df['comentarios'].apply(extract_iwp).dropna()
+        df = pd.merge(
+            df, 
+            df_iwp, 
+            left_index=True, 
+            right_index=True,
+            suffixes=(None, '_iwp_extracted'),
+            how='left'
+        )
+        df.loc[df['iwp'].isna() | df['iwp'], 'iwp'] = df['comentarios_iwp_extracted']
         df['cwp'] = df['cwp'].str.replace(' ', '')
         df['tag'] = df['tag'].str.replace(' ', '')
         df['qtd_entregue'] = df['qtd_entregue'].str.replace(' ', '')
@@ -121,9 +155,14 @@ class Reports():
         df['qtd_entregue'] = df['qtd_entregue'].astype(float)
         df['qtd_solicitada'] = df['qtd_solicitada'].astype(float)
         df[['qtd_solicitada', 'qtd_entregue']] = df[['qtd_solicitada', 'qtd_entregue']].fillna(0) 
-        df.loc[df['iwp'].str.len() != 3, 'iwp'] = None
         df = df.dropna(subset=['tag'])           
-        return df
+        self.df_distribuicao = df
+
+    def merge_with(self, other_report):
+        self.df_distribuicao = pd.concat([self.df_distribuicao, other_report.df_distribuicao])
+        self.df_recebimento = pd.concat([self.df_recebimento, other_report.df_recebimento])
+        self.df_desenho = pd.concat([self.df_desenho, other_report.df_desenho])
+        return self
 
     @staticmethod
     def _get_quantities(df, df_warehouse):   

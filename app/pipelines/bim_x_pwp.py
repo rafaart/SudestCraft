@@ -1,25 +1,27 @@
 import pandas as pd
-import suppliers
 import os
-import pipeline_tools
-from materials import Reports
-from bim_tools import TracerFullReport
-from masterplan import Masterplan
+from pipelines import pipeline_tools
+from data_sources.suppliers import LX, CronogramaMasterConstrucap, ProducaoEMALTO, RomaneioEMALTO, ProducaoFAM
+from data_sources.materials import Reports
+from data_sources.ifc_sources import TracerFullReport
+from data_sources.masterplan import Masterplan
 
 pd.options.mode.chained_assignment = None
 
 def famsteel():
     output_dir = os.environ['OUTPUT_FAM_NEWSTEEL']
 
-    cronograma_construcap = suppliers.CronogramaMasterConstrucap(os.environ['MONTADORA_PATH_NEWSTEEL'])
-    producao = suppliers.ProducaoFAM(os.environ['PRODUCAO_PATH_NEWSTEEL'])
-    reports = Reports(os.environ['REPORTS_PATH_NEWSTEEL'])
+    cronograma_construcap = CronogramaMasterConstrucap(os.environ['MONTADORA_PATH_NEWSTEEL'])
+    producao = ProducaoFAM(os.environ['PRODUCAO_PATH_NEWSTEEL'])
     tracer = TracerFullReport(os.environ['TRACER_PATH_NEWSTEEL'])
+    reports = Reports(os.environ['REPORTS_PATH_NEWSTEEL'])
+    reports.clean_reports()
+    
 
     df_cronograma_construcap = cronograma_construcap.get_report()
     df_producao = producao.get_report()
-    df_desenho = reports.get_status_desenho()
-    df_recebimento = reports.get_recebimento()
+    df_desenho = reports.df_desenho
+    df_recebimento = reports.df_recebimento
 
     df_producao['chave'] = df_producao['chave'].replace(' ', '')
 
@@ -71,16 +73,18 @@ def famsteel():
 def emalto():
     output_dir = os.environ['OUTPUT_EMALTO_NEWSTEEL']
 
-    cronograma_construcap = suppliers.CronogramaMasterConstrucap(os.environ['MONTADORA_PATH_NEWSTEEL'])
-    producao = suppliers.ProducaoEMALTO(os.environ['PRODUCAO_PATH_NEWSTEEL'])
-    romaneio = suppliers.RomaneioEMALTO(os.environ['ROMANEIO_PATH_NEWSTEEL'])
-    reports = Reports(os.environ['REPORTS_PATH_NEWSTEEL'])
+    cronograma_construcap = CronogramaMasterConstrucap(os.environ['MONTADORA_PATH_NEWSTEEL'])
+    producao = ProducaoEMALTO(os.environ['PRODUCAO_PATH_NEWSTEEL'])
+    romaneio = RomaneioEMALTO(os.environ['ROMANEIO_PATH_NEWSTEEL'])
     tracer = TracerFullReport(os.environ['TRACER_PATH_NEWSTEEL'])
+    reports = Reports(os.environ['REPORTS_PATH_NEWSTEEL'])
+    reports.clean_reports()
+    
 
     df_cronograma_construcap = cronograma_construcap.get_report()
     df_producao = producao.get_report()
-    df_desenho = reports.get_status_desenho()
-    df_recebimento = reports.get_recebimento()
+    df_desenho = reports.df_desenho
+    df_recebimento = reports.df_recebimento
     df_tracer = tracer.read_stagging_data().get_report()
     df_romaneio = romaneio.get_report()
 
@@ -98,6 +102,7 @@ def emalto():
         on='cwp',        
         how='left'
     )
+
     df_romaneio_only = df_romaneio.loc[~df_romaneio['tag'].isin(df['tag'])].rename(columns={'qtd_romaneio' :'qtd_total'})
     df_romaneio_only['cwa_number'] = df_romaneio_only['cwa'].str.extract('(\d+)')
     df = pd.concat([
@@ -107,27 +112,28 @@ def emalto():
 
     df, df_romaneio = pipeline_tools.consume_warehouse(df, 'qtd_total', df_romaneio, 'qtd_romaneio')
     df, df_recebimento = pipeline_tools.consume_warehouse(df, 'qtd_total', df_recebimento, 'qtd_recebida')
-        
+
     df['peso_romaneio'] = df['qtd_romaneio'] * df['peso_un'] 
     df['peso_recebido'] = df['qtd_recebida'] * df['peso_un'] 
 
-    qtd_columns = ['qtd_programacao', 'qtd_preparacao', 'qtd_fabricacao', 'qtd_expedicao']
-    df[qtd_columns] = df[qtd_columns].subtract(df['qtd_romaneio'], axis=0)
-    qtd_columns += ['qtd_romaneio']
-    df[qtd_columns] = df[qtd_columns].subtract(df['qtd_recebida'], axis=0)
-    df[qtd_columns] = df[qtd_columns].applymap(lambda x: 0 if x <0 else x)
+    for column in ['qtd_programacao', 'qtd_preparacao', 'qtd_fabricacao', 'qtd_expedicao']:
+        df[column] = df[column] - df[['qtd_romaneio', 'qtd_recebida']].max(axis=1)
+        df[column] = df[column].apply(lambda x: 0 if x <0 else x)
+    df['qtd_romaneio'] -= df['qtd_recebida']
 
-    peso_columns = ['peso_programacao', 'peso_preparacao', 'peso_fabricacao', 'peso_expedicao']
-    df[peso_columns] = df[peso_columns].subtract(df['peso_romaneio'], axis=0)
-    peso_columns += ['peso_romaneio']
-    df[peso_columns] = df[peso_columns].subtract(df['peso_recebido'], axis=0)
-    df[peso_columns] = df[peso_columns].applymap(lambda x: 0 if x <0 else round(x, 3))
+    for column in ['peso_programacao', 'peso_preparacao', 'peso_fabricacao', 'peso_expedicao']:
+        df[column] = df[column] - df[['peso_romaneio', 'peso_recebido']].max(axis=1)
+        df[column] = df[column].apply(lambda x: 0 if x <0 else x)
+    df['peso_romaneio'] -= df['peso_recebido']
 
+    df['qtd_romaneio'] += df['qtd_expedicao']     
+    df['peso_romaneio'] += df['peso_expedicao']    
+    df = df.drop(columns=['qtd_expedicao', 'peso_expedicao']) 
     df_fill  = df[['cwa_number']].drop_duplicates(keep='first')
     df = pd.concat([df, df_fill], ignore_index=True)
     df['chave'] = df['cwa_number'] + '-' + df['tag'].fillna('')
 
-    df_tracer = df_tracer.loc[df_tracer['file_name'].str.contains('VG-P0400', na=False)]
+    df_tracer = df_tracer.loc[df_tracer['supplier'].str.contains('EMALTO', na=False)]
     df_tracer['cwa_number'] = df_tracer['file_name'].str.split('-').str[2]
     df_tracer['chave'] = df_tracer['cwa_number'] + '-' + df_tracer['tag'].fillna('')
 
@@ -138,9 +144,8 @@ def emalto():
         on=['cwa_number', 'tag'],
         suffixes=[None, '_romaneio']
     )   
-    df_tracer[qtd_columns] = df_tracer[qtd_columns ].fillna(0)
     df_tracer['status'] = df_tracer.apply(pipeline_tools.apply_status_emalto, axis=1)
-    df_tracer.loc[df_tracer['status'] == '7.Inconsistente', 'chave'] = df_tracer['cwa_number'] + '-'
+    df_tracer.loc[df_tracer['status'] == '6.Inconsistente', 'chave'] = df_tracer['cwa_number'] + '-'
     df_tracer.to_csv(os.path.join(output_dir, 'tracer_data.csv'), index=False)
     df.to_csv(os.path.join(output_dir, 'inventory_data.csv'), index=False)
 
@@ -150,9 +155,10 @@ def codeme():
     output_dir = os.environ['OUTPUT_CODEME_CAPANEMA'] 
 
     masterplan = Masterplan(os.environ['MASTERPLAN_PATH_CAPANEMA'])
-    lx = suppliers.LX(os.environ['LX_PATH_CAPANEMA'])
-    reports = Reports(os.environ['REPORTS_PATH_CAPANEMA'])
+    lx = LX(os.environ['LX_PATH_CAPANEMA'])
     tracer = TracerFullReport(os.environ['TRACER_PATH_CAPANEMA'])
+    reports = Reports(os.environ['REPORTS_PATH_CAPANEMA'])
+    reports.clean_reports()
 
     lx._run_pipeline()
     print(lx.df_errors)
@@ -166,7 +172,7 @@ def codeme():
 
     df_main = pd.merge(
         left=df_lx,
-        right=reports.get_status_desenho(), 
+        right=reports.df_desenho, 
         on=['cwp', 'tag'],
         how='left',
         suffixes=(None, '_materials')
@@ -179,7 +185,7 @@ def codeme():
         how='left'
     )
     
-    df_main = pipeline_tools.get_quantities(df_main.sort_values(by='data_inicio', ascending=True), reports.get_recebimento())
+    df_main = pipeline_tools.get_quantities(df_main.sort_values(by='data_inicio', ascending=True), reports.df_recebimento)
     df_main['qtd_faltante'] = df_main['qtd_lx'] - df_main['qtd_recebida']
     df_main['cod_navegacao'] = df_main['cwp_number'] + '-' + df_main['cod_ativo']
     df_main['chave'] = df_main['cwp'] + '-' + df_main['tag']
@@ -226,9 +232,10 @@ def sinosteel():
     output_dir = os.environ['OUTPUT_SINOSTEEL_CAPANEMA'] 
 
     masterplan = Masterplan(os.environ['MASTERPLAN_PATH_CAPANEMA'])
-    lx = suppliers.LX(os.environ['LX_PATH_CAPANEMA'])
-    reports = Reports(os.environ['REPORTS_PATH_CAPANEMA'])
+    lx = LX(os.environ['LX_PATH_CAPANEMA'])
     tracer = TracerFullReport(os.environ['TRACER_PATH_CAPANEMA'])
+    reports = Reports(os.environ['REPORTS_PATH_CAPANEMA'])
+    reports.clean_reports()
     df_lx = lx.get_report()
 
     df_numeric = df_lx[['cwp', 'tag', 'qtd_lx']].groupby(['cwp', 'tag'], as_index=False).sum(numeric_only=True)
@@ -238,7 +245,7 @@ def sinosteel():
 
     df_main = pd.merge(
         left=df_lx,
-        right=reports.get_status_desenho(), 
+        right=reports.df_desenho, 
         on=['cwp', 'tag'],
         how='left',
         suffixes=(None, '_materials')
@@ -251,7 +258,7 @@ def sinosteel():
         how='left'
     )
 
-    df_main = pipeline_tools.get_quantities(df_main.sort_values(by='data_inicio', ascending=True), reports.get_recebimento())
+    df_main = pipeline_tools.get_quantities(df_main.sort_values(by='data_inicio', ascending=True), reports.df_recebimento)
     df_main['qtd_faltante'] = df_main['qtd_lx'] - df_main['qtd_recebida']
     df_main['cod_navegacao'] = 'CWP' + df_main['cwp_number']
     df_main['chave'] = df_main['cwp'] + '-' + df_main['tag']

@@ -78,7 +78,7 @@ class LX():
         self.grouped_by_building = grouped_by_building
         self.config = {
             'extensions': ['.xls', '.xlsx'],
-            'ignore':['.SUPERADOS', 'old'],
+            'ignore':['.SUPERADOS', 'old', 'ETL'],
             'depth':2
         }
 
@@ -132,7 +132,7 @@ class LX():
                             worksheet = workbook.parse(
                                 sheet,
                                 skiprows=2,
-                                na_values=[' ', 'D', '-'],
+                                na_values=[' ', 'D', '-', '1\n1'],
                                 usecols=['CWP', 'PESO UNIT(KG)', 'CÓDIGO DO MATERIAL (SKU)', 'QTDE', 'DESCRIÇÃO COMPLETA', 'OBS', 'TAG DA REFERÊNCIA'],
                                 converters={
                                     'CWP': str, 
@@ -189,120 +189,6 @@ class LX():
         df_categorical = df.copy().drop(columns=['qtd_lx']).drop_duplicates(subset=keys, keep='first')
         df = pd.merge(df_numeric, df_categorical, how='left', on=keys)
         df = df.sort_values(by=['rev'], ascending=False).drop_duplicates(subset=['cod_vale', 'cwp', 'tag'], keep='first')
-
-        self.df_lx = df
-
-
-class SuppliersLX():
-    def __init__(self, source_dir, mapper_dir, grouped_by_building=False) -> None:
-        self.source_dir = source_dir
-        self.mapper_dir = mapper_dir
-        self.grouped_by_building = grouped_by_building
-
-    def get_report(self):
-        self._run_pipeline()
-        return self.df_report
-
-    def get_erros(self):
-        self._run_pipeline()
-        return self.df_errors
-
-    def _run_pipeline(self):
-        self._read_mapper()
-        self._clean_mapper()
-        self._read_files()
-        self._clean_raw()
-        self.df_report = pd.merge(
-            left=self.df_lx,
-            right=self.df_mapper,
-            on='file_name',
-            how='left'
-        )
-    
-    def _read_mapper(self):
-        for item in os.listdir(self.mapper_dir):
-            item_path = os.path.join(self.mapper_dir, item)
-            if os.path.isfile(item_path) and 'lx-fornecedores' in item.lower():
-                self.df_mapper = pd.read_excel(
-                    item_path,
-                    usecols=['Documento', 'Empresa']
-                )
-
-    def _clean_mapper(self):
-        df = self.df_mapper
-        df = df.rename(columns={
-            'Documento': 'file_name', 
-            'Empresa': 'supplier'
-        })
-        df['supplier'] = df['supplier'].str.split(' ').str[0].str.replace(' ', '')
-        self.df_mapper = df
-
-    def _read_files(self):
-        worksheets = []
-        df_errors = pd.DataFrame(columns=['file', 'sheet'])
-        for item in os.listdir(self.source_dir):
-            if os.path.isfile(os.path.join(self.source_dir, item)):
-                try:
-                    mod_date = os.path.getmtime(os.path.join(self.source_dir, item))
-                    workbook = pd.ExcelFile(os.path.join(self.source_dir, item))
-                    for sheet in workbook.sheet_names:
-                        if 'rosto' not in sheet.lower():
-                            try:
-                                worksheet = workbook.parse(
-                                    sheet,
-                                    skiprows=2,
-                                    na_values=[' ', 'D'],
-                                    usecols=['CWP', 'PESO UNIT(KG)', 'CÓDIGO DO MATERIAL (SKU)', 'QTDE', 'DESCRIÇÃO COMPLETA', 'OBS', 'TAG DA REFERÊNCIA'],
-                                    converters={
-                                        'CWP': str, 
-                                        'CÓDIGO DO MATERIAL (SKU)': str, 
-                                        'DESCRIÇÃO COMPLETA': str,  
-                                        'OBS': str,  
-                                        'TAG DA REFERÊNCIA': str
-                                    }
-                                )
-                                worksheet['sheet_name'] = sheet
-                                worksheet['file_name'] = item.split('_')[0]
-                                worksheet['last_mod_date'] = datetime.fromtimestamp(mod_date).strftime('%Y-%m-%d %H:%M:%S')
-                                worksheets.append(worksheet)
-                            except:
-                                row = pd.DataFrame({'file': [item], 'sheet': [sheet]})
-                                df_errors = pd.concat([df_errors, row], axis=0, ignore_index=True)          
-                except Exception as e:
-                    print("Error when reading: ", os.path.join(self.source_dir, item))
-                    row = pd.DataFrame({'file': [item], 'sheet': None})
-                    df_errors = pd.concat([df_errors, row], axis=0, ignore_index=True)                
-        self.df_raw = pd.concat(worksheets, axis=0, ignore_index=True)
-        self.df_errors = df_errors
-
-    def _clean_raw(self):
-        df = self.df_raw
-        df = df.rename(columns={
-            'CWP': 'cwp',
-            'TAG DA REFERÊNCIA': 'cod_ativo',
-            'CÓDIGO DO MATERIAL (SKU)': 'tag',
-            'DESCRIÇÃO COMPLETA': 'descricao',
-            'QTDE': 'qtd_lx', 
-            'PESO UNIT(KG)': 'peso_un',
-            'OBS': 'obs'
-        })
-        df = df.dropna(subset=['cwp', 'tag', 'qtd_lx'])
-        df['cwp'] = df['cwp'].str.replace(' ', '')
-        df['tag'] = df['tag'].str.replace(' ', '')
-        
-        df.loc[~df['obs'].str.contains('NÃO MODELAD', na=False), 'geometry'] = True
-        df.loc[df['obs'].str.contains('NÃO MODELAD', na=False), 'geometry'] = False
-
-        df['cwp_number'] = df['cwp'].str.split('-').str[-1]
-        df['chave'] = df['cwp_number'].str.zfill(3) + '-' + df['tag']
-        df.loc[df['peso_un'].str.contains(',', na=False, regex=False), 'peso_un'] = df['peso_un'].str.replace('.', '').str.replace(',', '.')
-        df['peso_un'] = df['peso_un'].apply(lambda x: 0 if '-' in str(x) else float(x))
-        df['qtd_lx'] = df['qtd_lx'].astype(float)
-
-        keys = ['cwp', 'cod_ativo', 'tag'] if self.grouped_by_building else ['cwp', 'tag']
-        df_numeric = df[keys + ['qtd_lx']].groupby(by=keys, as_index=False).sum(numeric_only=True).round(0)
-        df_categorical = df.copy().drop(columns=['qtd_lx']).drop_duplicates(subset=keys, keep='first')
-        df = pd.merge(df_numeric, df_categorical, how='left', on=keys)
 
         self.df_lx = df
 
@@ -640,11 +526,12 @@ class ProducaoEMALTO():
         df[numeric_columns] = df[numeric_columns].fillna(0.)
         df = df.fillna(method='ffill')
         df['cwa'] = df['cwa'].str.split('CWA')
-        df['cwa'] = df['cwa'].str[1].str[:3]
+        df['cwa'] = df['cwa'].str[1].str[:4]
         df['cwa'] = df['cwa'].str.extract('(\d+)')
         df['cwa'] = df['cwa'].str.zfill(3)
         df['cwa'] = 'CWA'+df['cwa']
         df['cwa_number'] = df['cwa'].str.extract('(\d+)')
+        
         df['peso_un'] = df['peso_total'].astype(float) / df['qtd_total'].astype(float)
         df['peso_fabricacao'] = df[['peso_montagem', 'peso_soldagem', 'peso_acabamento', 'peso_jateamento', 'peso_pintura']].max(axis=1) - df['peso_expedicao']
         df['peso_preparacao'] = df['peso_preparacao'] - df['peso_fabricacao'] - df['peso_expedicao']
@@ -685,8 +572,6 @@ class RomaneioEMALTO():
             self.df_raw = pd.concat(self.workbooks, axis=0, ignore_index=True) 
         except:
             raise FileNotFoundError("Source file not found")
-        
-        
 
     def get_report(self):
         self._clean_report()

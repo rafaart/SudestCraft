@@ -1,23 +1,24 @@
-import pandas as pd
-import foundation
-import suppliers
 import os
-import pipeline_tools
-from materials import Reports
-from masterplan import ListaMaster, Masterplan
+import pandas as pd
+from pipelines import pipeline_tools
+from data_sources.suppliers import LX, CronogramaMasterConstrucap
+from data_sources.foundation import Summary
+from data_sources.materials import Reports
+from data_sources.masterplan import ListaMaster, Masterplan
 
 
 def newsteel():
     output_dir = os.environ['OUTPUT_MONTAGEM_ELETROMECANICA_NEWSTEEL']
+    summary = Summary(os.environ['SUMMARY_PATH_NEWSTEEL'])
+    masterplan = CronogramaMasterConstrucap(os.environ['MONTADORA_PATH_NEWSTEEL'])
     reports = Reports(os.environ['REPORTS_PATH_NEWSTEEL'])
-    summary = foundation.Summary(os.environ['SUMMARY_PATH_NEWSTEEL'])
-    masterplan = suppliers.CronogramaMasterConstrucap(os.environ['MONTADORA_PATH_NEWSTEEL'])
+    reports.clean_reports()
 
     df_summary = summary.get_report()
     df_masterplan = masterplan.get_report()
-    df_recebimento = reports.get_recebimento()
-    df_desenho = reports.get_status_desenho()
-    df_distribuicao = reports.get_distribuicao()
+    df_recebimento = reports.df_recebimento
+    df_desenho = reports.df_desenho
+    df_distribuicao = reports.df_distribuicao
 
     df_iwp = pd.merge(
         left=df_summary,
@@ -62,20 +63,21 @@ def newsteel():
 
 def capanema():
     output_dir = os.environ['OUTPUT_MONTAGEM_ELETROMECANICA_CAPANEMA']
-    reports = Reports(source_dir=os.environ['REPORTS_PATH_CAPANEMA'])
-    summary = foundation.Summary(os.environ['SUMMARY_PATH_CAPANEMA'])
+    summary = Summary(os.environ['SUMMARY_PATH_CAPANEMA'])
     masterplan = Masterplan(os.environ['MASTERPLAN_PATH_CAPANEMA'])
     lista_master = ListaMaster(os.environ['MASTERPLAN_PATH_CAPANEMA'])
-    lx = suppliers.LX(os.environ['LX_PATH_CAPANEMA'])
+    lx = LX(os.environ['LX_PATH_CAPANEMA'])
+    reports = Reports(source_dir=os.environ['REPORTS_PATH_CAPANEMA'])
+    reports.clean_reports()
 
     df_summary = summary.get_report()
     df_masterplan = masterplan.get_report()
     df_lista_master = lista_master.get_report()
-    df_recebimento = reports.get_recebimento()
-    df_desenho = reports.get_status_desenho()
-    df_distribuicao = reports.get_distribuicao()
-    df_lx = lx.get_report()
+    df_recebimento = reports.df_recebimento
+    df_desenho = reports.df_desenho
+    df_distribuicao = reports.df_distribuicao
 
+    df_lx = lx.get_report()
     df_iwp = pd.merge(
         left=df_summary,
         right=df_desenho,
@@ -83,12 +85,20 @@ def capanema():
         how='left',
         suffixes=['_summary', '_desenho']
     ).drop(columns='qtd_desenho').rename(columns={'qtd_summary': 'qtd_desenho'})
-
+    df_distribuicao_no_iwp = df_distribuicao.loc[df_distribuicao['iwp'].isna()]
+    df_distribuicao_iwp = df_distribuicao.loc[~df_distribuicao['iwp'].isna()]
+    df_distribuicao_iwp = df_distribuicao_iwp[['iwp', 'tag', 'qtd_solicitada', 'qtd_entregue']].groupby(['iwp', 'tag'], as_index=False).sum()
+    
+    df_iwp = pd.merge(
+        left=df_iwp,
+        right=df_distribuicao_iwp,
+        on=['iwp', 'tag'],
+        how='outer',
+        suffixes=[None, '_distribuicao']
+    )
     df_iwp = df_iwp.sort_values(by=['data_inicio', 'iwp'], ascending=True)
-    df_iwp = pipeline_tools.get_quantities_montagem_eletromecanica(df_iwp, df_distribuicao.copy().groupby(by=['iwp', 'tag'], as_index=False).sum(numeric_only=True), by=['iwp', 'tag'])
-    df_unknow_iwp = df_distribuicao.loc[~df_distribuicao[['iwp', 'tag']].apply(tuple,1).isin(df_iwp[['iwp', 'tag']].apply(tuple,1)), ['tag', 'qtd_solicitada', 'qtd_entregue']]
-    df_unknow_iwp = df_unknow_iwp.groupby(by=['tag'], as_index=False).sum(numeric_only=True)
-    df_iwp = pipeline_tools._predict_stock(df_iwp, df_unknow_iwp)
+    df_distribuicao_no_iwp = df_distribuicao_no_iwp[['tag', 'qtd_solicitada', 'qtd_entregue']].groupby(by=['tag'], as_index=False).sum(numeric_only=True)
+    df_iwp = pipeline_tools._predict_stock(df_iwp, df_distribuicao_no_iwp)
     df_iwp = Reports._get_quantities(df_iwp.sort_values(by='data_inicio', ascending=True), df_recebimento.copy())
     df_iwp = pd.merge(
         df_iwp,
@@ -123,16 +133,14 @@ def capanema():
         on=['cwp'],
         how='left',
         suffixes=(None, '_summary')
-    )
-
+    )    
     df_cwp = pd.merge(
         left=df_cwp,
         right=df_masterplan[['cwp', 'data_inicio']],
         on='cwp',
         how='left',
         suffixes=(None, '_masterplan')
-    )
-
+    )    
     df_cwp = pd.merge(
         left=df_cwp,
         right=df_lista_master[['cwp', 'descricao_cwp']],
@@ -140,7 +148,6 @@ def capanema():
         how='left',
         suffixes=(None, '_lista_master')
     )
-
     df_cwp.loc[df_cwp['data_inicio'].isna(), 'data_inicio'] = df_cwp['data_inicio_masterplan']
     df_cwp = df_cwp.sort_values(by='data_inicio', ascending=True, na_position='last')
     df_cwp = pipeline_tools.get_quantities_montagem_eletromecanica(df_cwp, df_distribuicao.groupby(by=['cwp', 'tag'], as_index=False).sum(numeric_only=True), by=['cwp','tag'])

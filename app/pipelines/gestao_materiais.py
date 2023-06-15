@@ -1,9 +1,10 @@
 import pandas as pd
-import foundation
-import suppliers
+import data_sources.foundation
+import data_sources.suppliers
 import os
-from materials import Reports
-from masterplan import Masterplan
+from data_sources import suppliers
+from data_sources.materials import Reports
+from data_sources.masterplan import Masterplan
 
 def newsteel():
     output_dir = os.environ['OUTPUT_GESTAO_MATERIAIS_NEWSTEEL']
@@ -13,18 +14,19 @@ def newsteel():
     fam_mining = suppliers.FamMining(os.environ['FORNECEDORES_PATH_NEWSTEEL'])
     fam_structure = suppliers.FamStructure(os.environ['FORNECEDORES_PATH_NEWSTEEL'])
     pq = suppliers.PQSimplified(os.environ['PQ_PATH_NEWSTEEL'])
-    lx = suppliers.LX(os.environ['LX_PATH_CAPANEMA'])
+    lx = suppliers.LX(os.environ['LX_PATH_NEWSTEEL'])
     reports = Reports(os.environ['REPORTS_PATH_NEWSTEEL'])
+    reports.clean_reports()
 
     df_construcap = construcap.get_report()
     df_aumond = aumond.get_report()
     df_fam_mining = fam_mining.get_report()
     df_fam_structure = fam_structure.get_report()
     df_pq = pq.get_report()
-    df_desenho = reports.get_status_desenho()
-    df_recebimento = reports.get_recebimento()
-    df_lx = lx.get_report()
-
+    lx._run_pipeline()
+    df_lx = lx.df_lx
+    df_error = lx.df_errors
+    print(df_error)
     df_suppliers = pd.concat([df_aumond, df_fam_mining, df_fam_structure])
     df_suppliers = df_suppliers.sort_values(by='data_termino', ascending=True).drop_duplicates(subset='cwp' ,keep='last')
 
@@ -45,7 +47,7 @@ def newsteel():
 
     df_main = pd.merge(
         left=df_main,
-        right=df_desenho,
+        right=reports.df_desenho,
         on='cwp',
         how='outer',
         suffixes=('_cronograma', '_desenho')
@@ -57,10 +59,10 @@ def newsteel():
         how='left',
         suffixes=(None, '_lx')
     )
-    df_main = Reports._get_quantities(df_main, df_recebimento)
+    df_main = Reports._get_quantities(df_main, reports.df_recebimento)
     df_main = pd.merge(
         df_main,
-        df_recebimento[['tag', 'peso_un', 'fornecedor']],
+        reports.df_recebimento[['tag', 'peso_un', 'fornecedor']],
         on='tag',
         how='left',
         suffixes=('_desenho', '_recebimento')
@@ -75,10 +77,11 @@ def newsteel():
 def capanema():
     output_dir=os.environ['OUTPUT_GESTAO_MATERIAIS_CAPANEMA']
 
-    reports = Reports(source_dir=os.environ['REPORTS_PATH_CAPANEMA'])
     memoria_calculo = suppliers.MemoriaCalculo(os.environ['MEMORIA_CALCULO_PATH_CAPANEMA'])
     lx = suppliers.LX(os.environ['LX_PATH_CAPANEMA'])
     masterplan = Masterplan(os.environ['MASTERPLAN_PATH_CAPANEMA'])
+    reports = Reports(source_dir=os.environ['REPORTS_PATH_CAPANEMA'])
+    reports.clean_reports()
 
     flsmidth = suppliers.ModeloCronogramaCapanema('flsmidth', os.environ['FORNECEDORES_PATH_CAPANEMA'])
     sinosteel_p1 = suppliers.ModeloCronogramaCapanema('sinosteel pct. 1', os.environ['FORNECEDORES_PATH_CAPANEMA'])
@@ -98,8 +101,6 @@ def capanema():
     df_suppliers = df_suppliers.sort_values(by='data_termino', ascending=True).drop_duplicates(subset='cwp' ,keep='last')
 
     df_masterplan = masterplan.get_report()
-    df_desenho = reports.get_status_desenho()
-    df_recebimento = reports.get_recebimento()
     df_lx = lx.get_report()
 
     memoria_calculo._clean_report()
@@ -122,7 +123,7 @@ def capanema():
     )
     df_main = pd.merge(
         left=df_main,
-        right=df_desenho,
+        right=reports.df_desenho,
         on='cwp',
         how='outer',
         suffixes=(None, '_desenho')
@@ -134,10 +135,10 @@ def capanema():
         how='left',
         suffixes=(None, '_lx')
     )
-    df_main = Reports._get_quantities(df_main.sort_values(by='data_inicio_masterplan', ascending=True), df_recebimento)
+    df_main = Reports._get_quantities(df_main.sort_values(by='data_inicio_masterplan', ascending=True), reports.df_recebimento)
     df_main = pd.merge(
         df_main,
-        df_recebimento[['tag', 'peso_un', 'fornecedor']],
+        reports.df_recebimento[['tag', 'peso_un', 'fornecedor']],
         on='tag',
         how='left',
         suffixes=('_desenho', '_recebimento')

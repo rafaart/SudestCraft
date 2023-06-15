@@ -89,22 +89,21 @@ def get_quantities(df, df_warehouse):
 
 
 def apply_status_emalto(row):
-    if (row[['qtd_programacao','qtd_preparacao','qtd_fabricacao','qtd_expedicao','qtd_romaneio','qtd_recebida']].sum()) < 1:
-        status = '7.Inconsistente'
+    row = row.fillna(0)
+    if (row[['qtd_programacao','qtd_preparacao','qtd_fabricacao','qtd_romaneio','qtd_recebida']].sum()) < 1:
+        status = '6.Inconsistente'
     elif row['order'] <= row['qtd_programacao']:
         status = '1.Programação'
     elif row['order'] <= row['qtd_programacao'] + row['qtd_preparacao']:
         status = '2.Preparação'
     elif row['order'] <= row['qtd_programacao'] + row['qtd_preparacao'] + row['qtd_fabricacao']:
         status = '3.Fabricação'
-    elif row['order'] <= row['qtd_programacao'] + row['qtd_preparacao'] + row['qtd_fabricacao'] + row['qtd_expedicao']:
-        status = '4.Expedição'
-    elif row['order'] <= row['qtd_programacao'] + row['qtd_preparacao'] + row['qtd_fabricacao'] + row['qtd_expedicao'] + row['qtd_romaneio']:
-        status = '5.Enviado EMALTO'
-    elif row['order'] <= row['qtd_programacao'] + row['qtd_preparacao'] + row['qtd_fabricacao'] + row['qtd_expedicao'] + row['qtd_romaneio'] + row['qtd_recebida']:
-        status = '6.Recebido Vale'
+    elif row['order'] <= row['qtd_programacao'] + row['qtd_preparacao'] + row['qtd_fabricacao'] + row['qtd_romaneio']:
+        status = '4.Enviado EMALTO'
+    elif row['order'] <= row['qtd_programacao'] + row['qtd_preparacao'] + row['qtd_fabricacao'] + row['qtd_romaneio'] + row['qtd_recebida']:
+        status = '5.Recebido Vale'
     else:
-        status = '7.Inconsistente'
+        status = '6.Inconsistente'
     return status
 
 
@@ -173,8 +172,9 @@ def apply_status_sinosteel(row):
 
 
 def get_quantities_montagem_eletromecanica(df, df_warehouse, by):   
-    df['qtd_solicitada'] = 0
-    df['qtd_entregue'] = 0
+    for qtd_column in ['qtd_solicitada', 'qtd_entregue']:
+        if qtd_column not in df.columns:
+            df[qtd_column] = 0
     for idx, row in df.iterrows():
         qtd_distribuida = df_warehouse.loc[(df_warehouse[by[0]] == row[by[0]]) & (df_warehouse[by[1]] == row[by[1]]), ['qtd_solicitada', 'qtd_entregue']]
         qtd_faltante = row['qtd_desenho']

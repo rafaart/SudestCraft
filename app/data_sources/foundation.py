@@ -38,6 +38,8 @@ class Summary:
             'HxGNBR_StringAttribute2': 'tag',
             'Component UID': 'guid' 
         })
+        df['data_inicio'] = pd.to_datetime(df['data_inicio'], format="%Y/%m/%d")
+        df['data_termino'] = pd.to_datetime(df['data_termino'], format="%Y/%m/%d")
         df = df.loc[df['proposito'].str.contains('Montagem', na=False)]
         df= df.sort_values(by=['data_inicio', 'proposito'], ascending=[True, False])
         df = df.dropna(subset='tag')
