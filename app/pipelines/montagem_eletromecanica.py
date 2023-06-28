@@ -1,7 +1,8 @@
 import os
 import pandas as pd
 from pipelines import pipeline_tools
-from data_sources.suppliers import LX, CronogramaMasterConstrucap
+from data_sources.suppliers import CronogramaMasterConstrucap
+from data_sources.LX import LX
 from data_sources.foundation import Summary
 from data_sources.materials import Reports
 from data_sources.masterplan import ListaMaster, Masterplan
@@ -67,6 +68,7 @@ def capanema():
     masterplan = Masterplan(os.environ['MASTERPLAN_PATH_CAPANEMA'])
     lista_master = ListaMaster(os.environ['MASTERPLAN_PATH_CAPANEMA'])
     lx = LX(os.environ['LX_PATH_CAPANEMA'])
+    lx_sinosteel = LX(r'C:\Users\EmmanuelSantana\VERUM PARTNERS\VERUM PARTNERS - VAL2018021\00.TI\Proj - Capanema\SMAT\LX\SINOSTEEL\LX_GERAL_SINOSTEEL')
     reports = Reports(source_dir=os.environ['REPORTS_PATH_CAPANEMA'])
     reports.clean_reports()
 
@@ -77,7 +79,15 @@ def capanema():
     df_desenho = reports.df_desenho
     df_distribuicao = reports.df_distribuicao
 
+    lx_sinosteel.config['depth'] = 0
+    lx_sinosteel._run_pipeline()
+    df_lx_sinosteel = lx_sinosteel.df_lx   
+    df_lx_sinosteel['supplier'] = 'SINOSTEEL'
+
     df_lx = lx.get_report()
+    df_lx = df_lx.loc[df_lx['supplier'] != 'SINOSTEEL']
+    df_lx = pd.concat([df_lx, df_lx_sinosteel])
+
     df_iwp = pd.merge(
         left=df_summary,
         right=df_desenho,
@@ -102,19 +112,12 @@ def capanema():
     df_iwp = Reports._get_quantities(df_iwp.sort_values(by='data_inicio', ascending=True), df_recebimento.copy())
     df_iwp = pd.merge(
         df_iwp,
-        df_recebimento[['tag', 'peso_un']],
-        on='tag',
-        how='left',
-        suffixes=('_desenho', '_recebimento')
-    )
-    
-    df_iwp = pd.merge(
-        df_iwp,
-        df_recebimento[['tag', 'peso_un', 'fornecedor']],
+        df_recebimento[['tag', 'peso_un_recebimento', 'fornecedor']],
         on='tag',
         how='left',
         suffixes=(None, '_recebimento')
     )
+    
     df_iwp = pd.merge(
         left=df_iwp,
         right=df_lx,
@@ -157,7 +160,7 @@ def capanema():
     df_cwp = Reports._get_quantities(df_cwp.sort_values(by='data_inicio', ascending=True), df_recebimento)
     df_cwp = pd.merge(
         df_cwp,
-        df_recebimento[['tag', 'peso_un', 'fornecedor']],
+        df_recebimento[['tag', 'peso_un_recebimento', 'fornecedor']],
         on='tag',
         how='left',
         suffixes=(None, '_recebimento')
@@ -170,6 +173,6 @@ def capanema():
         suffixes=(None, '_lx')
     )
     df_cwp['supplier'] = df_cwp['supplier'].fillna(df_cwp['fornecedor'])
-    df_cwp.loc[df_cwp['peso_un'].isna(), 'peso_un'] = df_cwp['peso_un_recebimento']
+    df_cwp.loc[df_cwp['peso_un_desenho'].isna(), 'peso_un_desenho'] = df_cwp['peso_un_recebimento']
 
     df_cwp.to_parquet(os.path.join(output_dir, 'cwp_data.parquet'), index=False)

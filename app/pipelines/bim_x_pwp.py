@@ -1,10 +1,11 @@
 import pandas as pd
 import os
 from pipelines import pipeline_tools
-from data_sources.suppliers import LX, CronogramaMasterConstrucap, ProducaoEMALTO, RomaneioEMALTO, ProducaoFAM
+from data_sources.suppliers import CronogramaMasterConstrucap, ProducaoEMALTO, RomaneioEMALTO, ProducaoFAM
 from data_sources.materials import Reports
 from data_sources.ifc_sources import TracerFullReport
 from data_sources.masterplan import Masterplan
+from data_sources.LX import LX
 
 pd.options.mode.chained_assignment = None
 
@@ -28,8 +29,6 @@ def famsteel():
     df_desenho['cwa'] = df_desenho['cwp'].str.split('-').str[2].str.zfill(3)
     df_desenho['tag'] = df_desenho['tag'].replace(' ', '')
     df_desenho['chave'] = 'CWA' + df_desenho['cwa'] + '-' + df_desenho['tag']
-    
-
     df = pd.merge(
         left=df_producao,
         right=df_desenho, 
@@ -96,13 +95,14 @@ def emalto():
         how='left',
         suffixes=(None, '_desenho')
     )
+    
     df = pd.merge(
         left=df,
         right=df_cronograma_construcap[['data_inicio', 'cwp']],
         on='cwp',        
         how='left'
     )
-
+    
     df_romaneio_only = df_romaneio.loc[~df_romaneio['tag'].isin(df['tag'])].rename(columns={'qtd_romaneio' :'qtd_total'})
     df_romaneio_only['cwa_number'] = df_romaneio_only['cwa'].str.extract('(\d+)')
     df = pd.concat([
@@ -120,11 +120,13 @@ def emalto():
         df[column] = df[column] - df[['qtd_romaneio', 'qtd_recebida']].max(axis=1)
         df[column] = df[column].apply(lambda x: 0 if x <0 else x)
     df['qtd_romaneio'] -= df['qtd_recebida']
+    df['qtd_romaneio'] = df['qtd_romaneio'].apply(lambda x: 0 if x <0 else x)
 
     for column in ['peso_programacao', 'peso_preparacao', 'peso_fabricacao', 'peso_expedicao']:
         df[column] = df[column] - df[['peso_romaneio', 'peso_recebido']].max(axis=1)
         df[column] = df[column].apply(lambda x: 0 if x <0 else x)
     df['peso_romaneio'] -= df['peso_recebido']
+    df['peso_romaneio'] = df['peso_romaneio'].apply(lambda x: 0 if x <0 else x)
 
     df['qtd_romaneio'] += df['qtd_expedicao']     
     df['peso_romaneio'] += df['peso_expedicao']    
@@ -146,6 +148,7 @@ def emalto():
     )   
     df_tracer['status'] = df_tracer.apply(pipeline_tools.apply_status_emalto, axis=1)
     df_tracer.loc[df_tracer['status'] == '6.Inconsistente', 'chave'] = df_tracer['cwa_number'] + '-'
+    df_errors = df_tracer.loc[df_tracer['status'].str.contains('consistente')]
     df_tracer.to_csv(os.path.join(output_dir, 'tracer_data.csv'), index=False)
     df.to_csv(os.path.join(output_dir, 'inventory_data.csv'), index=False)
 
@@ -202,7 +205,7 @@ def codeme():
     df_tracer = df_tracer.loc[df_tracer['cwp'] == df_tracer['file_name'].str[0:25]]
     df_tracer = pd.merge(
         left=df_tracer, 
-        right=df_main[['cwp', 'tag', 'qtd_recebida', 'qtd_lx', 'qtd_desenho', 'qtd_faltante', 'data_inicio', 'peso_un']],
+        right=df_main[['cwp', 'tag', 'qtd_recebida', 'qtd_lx', 'qtd_desenho', 'qtd_faltante', 'data_inicio', 'peso_un_lx']],
         on=['cwp', 'tag'],
         how='left'
     )  
@@ -222,7 +225,6 @@ def codeme():
             df_tracer.loc[df_tracer['cod_ativo'] == cod] = pipeline_tools.breakdown_by_axis(df_tracer.loc[df_tracer['cod_ativo'] == cod], 'file_name', 'location_z', 4)
         if sample_size > 30000:
             df_tracer.loc[df_tracer['cod_ativo'] == cod] = pipeline_tools.breakdown_by_axis(df_tracer.loc[df_tracer['cod_ativo'] == cod], 'file_name', 'location_z', 10)
-
     df_tracer.to_parquet(os.path.join(output_dir, 'tracer_data.parquet'), index=False)
     df_main.to_parquet(os.path.join(output_dir, 'inventory_data.parquet'), index=False)
 
@@ -233,16 +235,24 @@ def sinosteel():
 
     masterplan = Masterplan(os.environ['MASTERPLAN_PATH_CAPANEMA'])
     lx = LX(os.environ['LX_PATH_CAPANEMA'])
+    lx_sinosteel = LX(r'C:\Users\EmmanuelSantana\VERUM PARTNERS\VERUM PARTNERS - VAL2018021\00.TI\Proj - Capanema\SMAT\LX\SINOSTEEL\LX_GERAL_SINOSTEEL')
     tracer = TracerFullReport(os.environ['TRACER_PATH_CAPANEMA'])
     reports = Reports(os.environ['REPORTS_PATH_CAPANEMA'])
     reports.clean_reports()
+    
+    lx_sinosteel.config['depth'] = 0
+    lx_sinosteel._run_pipeline()
+    df_lx_sinosteel = lx_sinosteel.df_lx   
+    df_lx_sinosteel['supplier'] = 'SINOSTEEL'
+
     df_lx = lx.get_report()
+    df_lx = df_lx.loc[df_lx['supplier'] != 'SINOSTEEL']
+    df_lx = pd.concat([df_lx, df_lx_sinosteel])
 
     df_numeric = df_lx[['cwp', 'tag', 'qtd_lx']].groupby(['cwp', 'tag'], as_index=False).sum(numeric_only=True)
     df_categorical = df_lx.drop(columns=['qtd_lx']).drop_duplicates(subset=['cwp', 'tag'], keep='first')
     df_lx = pd.merge(df_numeric, df_categorical, how='left', on=['cwp', 'tag'])
     df_lx = df_lx.loc[df_lx['supplier'].str.contains('SINOSTEEL', na=False)]
-
     df_main = pd.merge(
         left=df_lx,
         right=reports.df_desenho, 
@@ -273,7 +283,7 @@ def sinosteel():
     df_tracer = df_tracer.loc[df_tracer['cwp'] == df_tracer['file_name'].str[0:25]]
     df_tracer = pd.merge(
         left=df_tracer, 
-        right=df_main[['cwp', 'tag', 'qtd_recebida', 'qtd_lx', 'qtd_desenho', 'qtd_faltante', 'data_inicio', 'peso_un']],
+        right=df_main[['cwp', 'tag', 'qtd_recebida', 'qtd_lx', 'qtd_desenho', 'qtd_faltante', 'data_inicio', 'peso_un_lx']],
         on=['cwp', 'tag'],
         how='left'
     )  

@@ -4,7 +4,8 @@ from pipelines import pipeline_tools
 from data_sources.materials import Reports
 from data_sources.ifc_sources import TracerFullReport, Vcad
 from data_sources.masterplan import Masterplan
-from data_sources.suppliers import LX, CronogramaMasterConstrucap
+from data_sources.suppliers import CronogramaMasterConstrucap
+from data_sources.LX import LX
 import ifcopenshell
 import ifcopenshell.api
 

@@ -63,16 +63,16 @@ class Reports():
             ' Tag/Código': 'tag', 
             ' Quantidade em BOM': 'qtd_desenho',
             ' Descrição': 'descricao',
-            ' Peso Unit': 'peso_un'
+            ' Peso Unit': 'peso_un_desenho'
         })
         df['tag'] = df['tag'].str.replace(' ', '')
         df['tag'] = df['tag'].str.upper()
         df['cwp'] = df[' Nº LM'].str.replace(' ', '').str.split('/').str[-1]
-        df['peso_un'] == df['peso_un'].fillna(0)
+        df['peso_un_desenho'] == df['peso_un_desenho'].fillna(0)
         df = df.drop(columns=[' Nº LM'])
         df = df.drop_duplicates(subset=['cwp', 'tag'])
         df[['tag', 'descricao', 'cwp']] = df[['tag', 'descricao', 'cwp']].applymap(lambda x: str(x))
-        df['peso_un'] = df['peso_un'].apply(lambda x: float(x))
+        df['peso_un_desenho'] = df['peso_un_desenho'].apply(lambda x: float(x))
 
         ########################################################################################
         df = df.loc[~df['cwp'].str.contains('VG-P0400-022-S-MT-0101.01-CWP-EMALTO', na=False)]
@@ -86,13 +86,13 @@ class Reports():
             ' TAG/CÓDIGO ': 'tag', 
             ' QT RECEBIDA ': 'qtd_recebida', 
             ' FORNECEDOR ': 'fornecedor',
-            ' ATTR_VALUE': 'peso_un'
+            ' ATTR_VALUE': 'peso_un_recebimento'
         })
         df['tag'] = df['tag'].str.upper().str.replace(' ', '')
         df['qtd_recebida'] = df['qtd_recebida'].astype(float)
-        df['peso_un'] = df['peso_un'].astype(float)
+        df['peso_un_recebimento'] = df['peso_un_recebimento'].astype(float)
         df['fornecedor'] = df['fornecedor'].str.split('-').str[0].str.replace(' ', '')
-        df_categorical = df[['tag', 'fornecedor', 'peso_un']].drop_duplicates(subset='tag' ,keep='first')
+        df_categorical = df[['tag', 'fornecedor', 'peso_un_recebimento']].drop_duplicates(subset='tag' ,keep='first')
         df_numerical = df[['tag', 'qtd_recebida']].groupby('tag', as_index=False).sum()
         df = pd.merge(
             df_numerical,
@@ -180,7 +180,7 @@ class Reports():
                     df.loc[idx, 'qtd_recebida'] = qtd_recebida
                     df_warehouse.loc[df_warehouse['tag'] == row['tag'], 'qtd_recebida'] = 0
 
-        df_warehouse = df_warehouse.loc[df_warehouse['qtd_recebida'] > 0, ['tag', 'qtd_recebida', 'peso_un']]
+        df_warehouse = df_warehouse.loc[df_warehouse['qtd_recebida'] > 0, ['tag', 'qtd_recebida', 'peso_un_recebimento']]
         df_warehouse['cwp'] = 'CWP NÃO ENCONTRADO'
         df = pd.concat([
             df,

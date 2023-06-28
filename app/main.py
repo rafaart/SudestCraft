@@ -19,6 +19,7 @@ if __name__ == "__main__":
     # extract_ifc_data.emalto()
     # extract_ifc_data.famsteel()
     # lx_check.newsteel()
+
     # montagem_eletromecanica.newsteel()
     # gestao_materiais.newsteel()
     # bim_x_pwp.emalto()

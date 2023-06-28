@@ -3,7 +3,7 @@ import ifcopenshell
 import ifcopenshell.geom
 import pandas as pd
 from config.config import Ifc
-from data_sources.suppliers import LX
+from data_sources.LX import LX
 from data_sources.ifc_sources import IfcDataBase
 import numpy as np
 import multiprocessing as mp
