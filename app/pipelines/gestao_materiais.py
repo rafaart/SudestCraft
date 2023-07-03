@@ -1,3 +1,4 @@
+"""Pipeline desenvolvido para o BI de Gestão de Materiais"""
 import pandas as pd
 import data_sources.foundation
 import data_sources.suppliers
@@ -68,11 +69,11 @@ def newsteel():
         how='left',
         suffixes=(None, '_recebimento')
     )
-    print(df_main.columns)
     df_main.loc[df_main['peso_un_recebimento'].isna(), 'peso_un'] = df_main['peso_un_desenho']
     df_main.loc[df_main['peso_un'].isna(), 'peso_un'] = df_main['peso_un_recebimento']
     df_main['supplier'] = df_main['supplier'].fillna(df_main['fornecedor'])
     df_main.to_parquet(os.path.join(output_dir, 'report_data.parquet'), index=False)
+    _get_view_newsteel(df_main, os.path.join(output_dir, 'view_gestao_de_materiais.xlsx'))    
 
 
 
@@ -80,8 +81,8 @@ def capanema():
     output_dir=os.environ['OUTPUT_GESTAO_MATERIAIS_CAPANEMA']
 
     memoria_calculo = suppliers.MemoriaCalculo(os.environ['MEMORIA_CALCULO_PATH_CAPANEMA'])
-    lx = LX.LX(os.environ['LX_PATH_CAPANEMA'])
-    lx_sinosteel = LX.LX(r'C:\Users\EmmanuelSantana\VERUM PARTNERS\VERUM PARTNERS - VAL2018021\00.TI\Proj - Capanema\SMAT\LX\SINOSTEEL\LX_GERAL_SINOSTEEL')
+    lx = LX(os.environ['LX_PATH_CAPANEMA'])
+    lx_sinosteel = LX(r'C:\Users\EmmanuelSantana\VERUM PARTNERS\VERUM PARTNERS - VAL2018021\00.TI\Proj - Capanema\SMAT\LX\SINOSTEEL\LX_GERAL_SINOSTEEL')
     masterplan = Masterplan(os.environ['MASTERPLAN_PATH_CAPANEMA'])
     reports = Reports(source_dir=os.environ['REPORTS_PATH_CAPANEMA'])
     reports.clean_reports()
@@ -102,184 +103,238 @@ def capanema():
         dpi.get_report()
     ])
     df_suppliers = df_suppliers.sort_values(by='data_termino', ascending=True).drop_duplicates(subset='cwp' ,keep='last')
+    df_suppliers['data_inicio'] = df_suppliers['data_inicio'].dt.date
+    df_suppliers['data_termino'] = df_suppliers['data_termino'].dt.date
 
     df_masterplan = masterplan.get_report()
     lx_sinosteel.config['depth'] = 0
     lx_sinosteel._run_pipeline()
     df_lx_sinosteel = lx_sinosteel.df_lx   
     df_lx_sinosteel['supplier'] = 'SINOSTEEL'
-#     lx._run_pipeline()
+    lx._run_pipeline()
 
-#     df_lx = lx.df_lx
-#     df_lx = df_lx.loc[df_lx['supplier'] != 'SINOSTEEL']
-#     df_lx = pd.concat([df_lx, df_lx_sinosteel])
-#     memoria_calculo._clean_report()
-#     df_memoria = memoria_calculo.report
-#     df_demontagem = memoria_calculo.cwp_desmontagem
+    df_lx = lx.df_lx
+    df_lx = df_lx.loc[df_lx['supplier'] != 'SINOSTEEL']
+    df_lx = pd.concat([df_lx, df_lx_sinosteel])
+    memoria_calculo._clean_report()
+    df_memoria = memoria_calculo.report
+    df_demontagem = memoria_calculo.cwp_desmontagem
 
-#     df_main = pd.merge(
-#         left=df_masterplan,
-#         right=df_suppliers,
-#         on='cwp',
-#         how='left',
-#         suffixes=('_masterplan', '_fornecedor')
-#     )
-#     df_main = pd.merge(
-#         left=df_main,
-#         right=df_memoria[['cwp', 'peso_capex_ton']].groupby('cwp', as_index=False).sum(),
-#         on='cwp',
-#         how='left',
-#         suffixes=(None, '_memoria_cwp')
-#     )
-#     df_main = pd.merge(
-#         left=df_main,
-#         right=df_lx[['cwp', 'cod_ativo', 'tag', 'supplier', 'qtd_lx', 'peso_un_lx']],
-#         on='cwp',
-#         how='left',
-#         suffixes=(None, '_lx')
-#     )
-#     df_main = pd.merge(
-#         left=df_main,
-#         right=reports.df_desenho,
-#         on=['cwp', 'tag'],
-#         how='outer',
-#         suffixes=(None, '_desenho')
-#     )
-#     df_main = Reports._get_quantities(df_main.sort_values(by='data_inicio_masterplan', ascending=True), reports.df_recebimento)
-#     df_main = pd.merge(
-#         df_main,
-#         reports.df_recebimento[['tag', 'peso_un_recebimento', 'fornecedor']],
-#         on='tag',
-#         how='left',
-#         suffixes=(None, '_recebimento')
-#     )
-#     df_main.loc[df_main['peso_un_recebimento'].isna(), 'peso_un'] = df_main['peso_un_desenho']
-#     df_main.loc[df_main['peso_un'].isna(), 'peso_un'] = df_main['peso_un_recebimento']
-#     df_main['supplier'] = df_main['supplier'].fillna(df_main['fornecedor'])
-#     df_main = pd.merge(
-#         left=df_main,
-#         right=df_memoria[['cwp', 'fornecedor', 'peso_capex_ton']].rename(columns={'fornecedor':'supplier'}).groupby(['cwp','supplier'], as_index=False).sum(),
-#         on=['cwp','supplier'],
-#         how='outer',
-#         suffixes=(None, '_memoria_fornecedor')
-#     )
-#     df_main = df_main.loc[~df_main['cwp'].isin(df_demontagem['cwp'])]
-#     df_missing_supplier = df_main.loc[df_main['supplier'].isna() & ~df_main['peso_capex_ton'].isna(), ['cwp']].drop_duplicates(keep='first')
-#     df_missing_supplier['supplier_flag'] = False
-#     df_main = pd.merge(
-#         df_main,
-#         df_missing_supplier,
-#         on='cwp',
-#         how='left',
-#     )
+    df_main = pd.merge(
+        left=df_masterplan,
+        right=df_suppliers,
+        on='cwp',
+        how='left',
+        suffixes=('_masterplan', '_fornecedor')
+    )
+    df_main = pd.merge(
+        left=df_main,
+        right=df_memoria[['cwp', 'peso_capex_ton']].groupby('cwp', as_index=False).sum(),
+        on='cwp',
+        how='left',
+        suffixes=(None, '_memoria_cwp')
+    )
+    df_main = pd.merge(
+        left=df_main,
+        right=df_lx[['cwp', 'cod_ativo', 'tag', 'supplier', 'qtd_lx', 'peso_un_lx']],
+        on='cwp',
+        how='left',
+        suffixes=(None, '_lx')
+    )
+    df_main = pd.merge(
+        left=df_main,
+        right=reports.df_desenho,
+        on=['cwp', 'tag'],
+        how='outer',
+        suffixes=(None, '_desenho')
+    )
+    df_main = Reports._get_quantities(df_main.sort_values(by='data_inicio_masterplan', ascending=True), reports.df_recebimento)
+    df_main = pd.merge(
+        df_main,
+        reports.df_recebimento[['tag', 'peso_un_recebimento', 'fornecedor']],
+        on='tag',
+        how='left',
+        suffixes=(None, '_recebimento')
+    )
+    df_main.loc[df_main['peso_un_recebimento'].isna(), 'peso_un'] = df_main['peso_un_desenho']
+    df_main.loc[df_main['peso_un'].isna(), 'peso_un'] = df_main['peso_un_recebimento']
+    df_main['supplier'] = df_main['supplier'].fillna(df_main['fornecedor'])
+    df_main = pd.merge(
+        left=df_main,
+        right=df_memoria[['cwp', 'fornecedor', 'peso_capex_ton']].rename(columns={'fornecedor':'supplier'}).groupby(['cwp','supplier'], as_index=False).sum(),
+        on=['cwp','supplier'],
+        how='outer',
+        suffixes=(None, '_memoria_fornecedor')
+    )
+    df_main = df_main.loc[~df_main['cwp'].isin(df_demontagem['cwp'])]
+    df_missing_supplier = df_main.loc[df_main['supplier'].isna() & ~df_main['peso_capex_ton'].isna(), ['cwp']].drop_duplicates(keep='first')
+    df_missing_supplier['supplier_flag'] = False
+    df_main = pd.merge(
+        df_main,
+        df_missing_supplier,
+        on='cwp',
+        how='left',
+    )
 
-#     #############FILTERS
-#     df_main = df_main.loc[df_main['cwp'].str.contains('-S1985-', na=False) | df_main['cwp'].str.contains('CWP NÃO ENCONTRADO', na=False)]
-#     df_main = df_main.loc[~df_main['cwp'].str.contains('-M-SD-', na=False)]
-#     df_main = df_main.loc[~df_main['supplier'].isin(["00000004" ,"4100680511","4100690394","5500091398","90000959","90002705"])]
-#     #############FILTERS
+    #############FILTERS
+    # df_main = df_main.loc[df_main['cwp'].str.contains('-S1985-', na=False) | df_main['cwp'].str.contains('CWP NÃO ENCONTRADO', na=False)]
+    df_main = df_main.loc[~df_main['cwp'].str.contains('-M-SD-', na=False)]
+    df_main = df_main.loc[~df_main['supplier'].isin(["00000004" ,"4100680511","4100690394","5500091398","90000959","90002705"])]
+    #############FILTERS
 
     
-#     df_main.to_parquet(os.path.join(output_dir, 'report_data.parquet'), index=False)
-#     df_memoria.to_parquet(os.path.join(output_dir, 'memoria_calculo.parquet'), index=False)
-#     _get_view(df_main, os.path.join(output_dir, 'view_gestao_de_materiais.xlsx'))    
+    df_main.to_parquet(os.path.join(output_dir, 'report_data.parquet'), index=False)
+    df_memoria.to_parquet(os.path.join(output_dir, 'memoria_calculo.parquet'), index=False)
+    _get_view(df_main, os.path.join(output_dir, 'view_gestao_de_materiais.xlsx'))    
 
 
-# def _get_view(df, output_path):
-#     now = datetime.datetime.now()
-#     df_view = df[[
-#         'cwp',
-#         'cod_ativo',
-#         'tag',
-#         'supplier',
-#         'qtd_lx',
-#         'peso_un',
-#         'qtd_desenho',
-#         'peso_un_desenho',
-#         'peso_un_recebimento',
-#         'qtd_recebida',
-#         'peso_un_lx',
-#         'descricao_desenho',
-#         'peso_capex_ton_memoria_fornecedor',
-#         'data_inicio_fornecedor',
-#         'data_termino_fornecedor',
-#         'data_inicio_masterplan',
-#     ]]
-#     df_view['data_inicio_fornecedor'] = df_view['data_inicio_fornecedor'].dt.date
-#     df_view['data_termino_fornecedor'] = df_view['data_termino_fornecedor'].dt.date
-#     df_view['data_inicio_masterplan'] = df_view['data_inicio_masterplan'].dt.date
-#     df_view.insert(13, 'prontidao', df_view['data_inicio_masterplan'] - pd.Timedelta(days=30))
-#     df_view.insert(3, 'peso_lx', df_view['qtd_lx'] * df_view['peso_un_lx'] / 1000)
-#     df_view.insert(4, 'peso_desenho', df_view['qtd_desenho'] * df_view['peso_un_desenho'] / 1000)
-#     df_view.insert(5, 'peso_recebido', df_view['qtd_recebida'] * df_view['peso_un'] / 1000)
+def _get_view(df_view, output_path):
+    now = datetime.datetime.now()
+    df_view.insert(13, 'prontidao', df_view['data_inicio_masterplan'] - pd.Timedelta(days=30))
+    df_view.insert(3, 'peso_lx', df_view['qtd_lx'] * df_view['peso_un_lx'] / 1000)
+    df_view.insert(4, 'peso_desenho', df_view['qtd_desenho'] * df_view['peso_un_desenho'] / 1000)
+    df_view.insert(5, 'peso_recebido', df_view['qtd_recebida'] * df_view['peso_un'] / 1000)
     
+    df_view_cwp = df_view[[
+        'cwp',
+        'supplier',
+        'peso_lx',
+        'peso_desenho',
+        'peso_recebido',
+        'peso_capex_ton_memoria_fornecedor',
+        'data_inicio_fornecedor',
+        'data_termino_fornecedor',
+        'prontidao',
+        'data_inicio_masterplan',
+    ]]
+    df_view_cwp = pd.merge(
+        df_view_cwp.groupby(['cwp', 'supplier'], as_index=False).sum(),
+        df_view_cwp[[
+            'cwp', 
+            'supplier', 
+            'data_inicio_fornecedor', 
+            'data_termino_fornecedor', 
+            'prontidao', 
+            'data_inicio_masterplan',
+        ]].drop_duplicates(subset=['cwp', 'supplier']),
+        on=['cwp', 'supplier']
+    )
+    df_view_cwp = df_view_cwp.rename(columns={
+        'cwp': 'CWP',
+        'supplier': 'Fornecedor',
+        'peso_lx': 'Peso LX (t)',
+        'peso_desenho': 'Peso Materials (t)',
+        'peso_recebido': 'Recebido (t)',
+        'peso_capex_ton_memoria_fornecedor': 'Peso PQ (t)',
+        'data_inicio_fornecedor': 'Start Tendência',
+        'data_termino_fornecedor': 'Finish Tendência',
+        'prontidao': 'Prontidão',
+        'data_inicio_masterplan': 'Inicio de Montagem',
+    })
 
-#     df_view_cwp = df_view[[
-#         'cwp',
-#         'supplier',
-#         'peso_lx',
-#         'peso_desenho',
-#         'peso_recebido',
-#         'peso_capex_ton_memoria_fornecedor',
-#         'data_inicio_fornecedor',
-#         'data_termino_fornecedor',
-#         'prontidao',
-#         'data_inicio_masterplan',
-#     ]]
-#     df_view_cwp = pd.merge(
-#         df_view_cwp.groupby(['cwp', 'supplier'], as_index=False).sum(),
-#         df_view_cwp[[
-#             'cwp', 
-#             'supplier', 
-#             'data_inicio_fornecedor', 
-#             'data_termino_fornecedor', 
-#             'prontidao', 
-#             'data_inicio_masterplan',
-#         ]].drop_duplicates(subset=['cwp', 'supplier']),
-#         on=['cwp', 'supplier']
-#     )
-#     df_view_cwp = df_view_cwp.rename(columns={
-#         'cwp': 'CWP',
-#         'supplier': 'Fornecedor',
-#         'peso_lx': 'Peso LX (t)',
-#         'peso_desenho': 'Peso Materials (t)',
-#         'peso_recebido': 'Recebido (t)',
-#         'peso_capex_ton_memoria_fornecedor': 'Peso PQ (t)',
-#         'data_inicio_fornecedor': 'Start Tendência',
-#         'data_termino_fornecedor': 'Finish Tendência',
-#         'prontidao': 'Prontidão',
-#         'data_inicio_masterplan': 'Inicio de Montagem',
-#     })
-
-#     df_view_tag = df_view[[
-#         'cwp',
-#         'cod_ativo',
-#         'tag',
-#         'supplier',
-#         'peso_lx',
-#         'peso_desenho',
-#         'peso_recebido',
-#         'qtd_desenho',
-#         'qtd_recebida',
-#         'descricao_desenho',
-#     ]].dropna(subset=['tag'])
+    df_view_tag = df_view[[
+        'cwp',
+        'cod_ativo',
+        'tag',
+        'supplier',
+        'peso_lx',
+        'peso_desenho',
+        'peso_recebido',
+        'qtd_desenho',
+        'qtd_recebida',
+        'descricao_desenho',
+    ]].dropna(subset=['tag'])
     
-#     df_view_tag = df_view_tag.rename(columns={
-#         'cwp': 'CWP',
-#         'cod_ativo': 'Cod Ativo',
-#         'tag': 'TAG',
-#         'supplier': 'Fornecedor',
-#         'peso_lx': 'Peso LX (t)',
-#         'peso_desenho': 'Peso Materials (t)',
-#         'qtd_desenho': 'Qtd. Materials',
-#         'peso_recebido': 'Recebido (t)',
-#         'qtd_recebida': 'Qtd. Recebimento',
-#         'descricao_desenho': 'Descrição Materials',
-#     })
+    df_view_tag = df_view_tag.rename(columns={
+        'cwp': 'CWP',
+        'cod_ativo': 'Cod Ativo',
+        'tag': 'TAG',
+        'supplier': 'Fornecedor',
+        'peso_lx': 'Peso LX (t)',
+        'peso_desenho': 'Peso Materials (t)',
+        'qtd_desenho': 'Qtd. Materials',
+        'peso_recebido': 'Recebido (t)',
+        'qtd_recebida': 'Qtd. Recebimento',
+        'descricao_desenho': 'Descrição Materials',
+    })
 
-#     writer = pd.ExcelWriter(output_path, engine = 'xlsxwriter')
-#     df_view_tag.to_excel(writer, sheet_name = 'Dados por Tag', index=False, startrow=1)
-#     df_view_cwp.to_excel(writer, sheet_name = 'Dados por CWP', index=False)
-#     worksheet = writer.sheets['Dados por Tag']
-#     worksheet.write(0, 0, f'Atualizado em {str(now.date())} {str(now.time().hour)}:{str(now.time().minute)}')
-#     writer.close()
+    writer = pd.ExcelWriter(output_path, engine = 'xlsxwriter')
+    df_view_tag.to_excel(writer, sheet_name = 'Dados por Tag', index=False, startrow=1)
+    df_view_cwp.to_excel(writer, sheet_name = 'Dados por CWP', index=False)
+    worksheet = writer.sheets['Dados por Tag']
+    worksheet.write(0, 0, f'Atualizado em {str(now.date())} {str(now.time().hour)}:{str(now.time().minute)}')
+    writer.close()
+
+
+def _get_view_newsteel(df_view, output_path):
+    now = datetime.datetime.now()
+    df_view.insert(13, 'prontidao', df_view['data_inicio_construcap'] - pd.Timedelta(days=30))
+    df_view.insert(3, 'peso_lx', df_view['qtd_lx'] * df_view['peso_un_lx'] / 1000)
+    df_view.insert(4, 'peso_desenho', df_view['qtd_desenho'] * df_view['peso_un_desenho'] / 1000)
+    df_view.insert(5, 'peso_recebido', df_view['qtd_recebida'] * df_view['peso_un'] / 1000)
+    
+    df_view_cwp = df_view[[
+        'cwp',
+        'supplier',
+        'peso_lx',
+        'peso_desenho',
+        'peso_recebido',
+        'data_inicio_fornecedor',
+        'data_termino_fornecedor',
+        'prontidao',
+        'data_inicio_construcap',
+    ]]
+    df_view_cwp = pd.merge(
+        df_view_cwp.groupby(['cwp', 'supplier'], as_index=False).sum(),
+        df_view_cwp[[
+            'cwp', 
+            'supplier', 
+            'data_inicio_fornecedor', 
+            'data_termino_fornecedor', 
+            'prontidao', 
+            'data_inicio_construcap',
+        ]].drop_duplicates(subset=['cwp', 'supplier']),
+        on=['cwp', 'supplier']
+    )
+    df_view_cwp = df_view_cwp.rename(columns={
+        'cwp': 'CWP',
+        'supplier': 'Fornecedor',
+        'peso_lx': 'Peso LX (t)',
+        'peso_desenho': 'Peso Materials (t)',
+        'peso_recebido': 'Recebido (t)',
+        'data_inicio_fornecedor': 'Start Tendência',
+        'data_termino_fornecedor': 'Finish Tendência',
+        'prontidao': 'Prontidão',
+        'data_inicio_construcap': 'Inicio de Montagem',
+    })
+
+    df_view_tag = df_view[[
+        'cwp',
+        'tag',
+        'supplier',
+        'peso_lx',
+        'peso_desenho',
+        'peso_recebido',
+        'qtd_desenho',
+        'qtd_recebida',
+        'descricao_desenho',
+    ]].dropna(subset=['tag'])
+    
+    df_view_tag = df_view_tag.rename(columns={
+        'cwp': 'CWP',
+        'tag': 'TAG',
+        'supplier': 'Fornecedor',
+        'peso_lx': 'Peso LX (t)',
+        'peso_desenho': 'Peso Materials (t)',
+        'qtd_desenho': 'Qtd. Materials',
+        'peso_recebido': 'Recebido (t)',
+        'qtd_recebida': 'Qtd. Recebimento',
+        'descricao_desenho': 'Descrição Materials',
+    })
+
+    writer = pd.ExcelWriter(output_path, engine = 'xlsxwriter')
+    df_view_tag.to_excel(writer, sheet_name = 'Dados por Tag', index=False, startrow=1)
+    df_view_cwp.to_excel(writer, sheet_name = 'Dados por CWP', index=False)
+    worksheet = writer.sheets['Dados por Tag']
+    worksheet.write(0, 0, f'Atualizado em {str(now.date())} {str(now.time().hour)}:{str(now.time().minute)}')
+    writer.close()

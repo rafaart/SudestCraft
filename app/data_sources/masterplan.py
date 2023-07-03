@@ -29,6 +29,7 @@ class Masterplan:
         df.loc[~df['cwp'].str.lower().str.contains('MT'), 'sheet_name'] = 'civil'
         df = df.loc[df['cwp'].str.contains('-CWP')]
         df['cwp'] = df['cwp'].str.replace(' ', '')
+        df['data_inicio_baseline'] = df['data_termino_baseline'].dt.date
         self.df_report = df
 
 

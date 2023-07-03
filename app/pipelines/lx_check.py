@@ -1,3 +1,5 @@
+"""Pipeline defasado. Houve um produto no sudeste em que o intuito era receber o modelo IFC e verificá-lo para evidênciar erros. Atualmente este
+teratamento de dados não está sendo utilizado e para reatiá-lo é necessário atualizar as fontes de dados e bibliotecas"""
 from materials import Reports
 from bim_tools import TracerFullReport
 from suppliers import SuppliersLX

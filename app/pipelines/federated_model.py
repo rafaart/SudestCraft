@@ -1,3 +1,5 @@
+"""Pipeline desenvolvido para automação da atualização do modelo federado. Aqui, os status de produção/entrega são
+inseridos de volta nos modelos IFC, que serão posteriormente federados em um único arquivo NWD com ajuda do Navis"""
 import pandas as pd
 import os
 from pipelines import pipeline_tools

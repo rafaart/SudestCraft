@@ -1,3 +1,4 @@
+"""Pipeline desenvolvido para o BI de visoes por PWP. Pode ser identificado pela presenca de elementos 3d no BI"""
 import pandas as pd
 import os
 from pipelines import pipeline_tools
@@ -172,7 +173,6 @@ def codeme():
     df_categorical = df_lx.drop(columns=['qtd_lx']).drop_duplicates(subset=['cwp', 'tag'], keep='first')
     df_lx = pd.merge(df_numeric, df_categorical, how='left', on=['cwp', 'tag'])
     df_lx = df_lx.loc[df_lx['supplier'].str.contains('CODEME', na=False)]
-
     df_main = pd.merge(
         left=df_lx,
         right=reports.df_desenho, 
@@ -180,14 +180,12 @@ def codeme():
         how='left',
         suffixes=(None, '_materials')
     )
-    
     df_main = pd.merge(
         left=df_main,
         right=masterplan.get_report(), 
         on='cwp',
         how='left'
     )
-    
     df_main = pipeline_tools.get_quantities(df_main.sort_values(by='data_inicio', ascending=True), reports.df_recebimento)
     df_main['qtd_faltante'] = df_main['qtd_lx'] - df_main['qtd_recebida']
     df_main['cod_navegacao'] = df_main['cwp_number'] + '-' + df_main['cod_ativo']
@@ -196,11 +194,10 @@ def codeme():
     df_fill = df_main[['cwp', 'cod_navegacao']].drop_duplicates(subset=['cwp'], keep='first')
     df_fill['chave'] = df_fill['cwp']
     df_main = pd.concat([df_main,df_fill], ignore_index=True)
-    
+  
     df_tracer = tracer.read_stagging_data().drop_missplaced_elements().get_report()
     df_tracer = df_tracer.loc[df_tracer['cwp'].isin(df_main['cwp'].drop_duplicates(keep='first'))]
     df_main = df_main.loc[df_main['cwp'].isin(df_tracer['cwp'].drop_duplicates(keep='first'))]
-
     df_tracer['cod_ativo'] = df_tracer['file_name'].str[26:]
     df_tracer = df_tracer.loc[df_tracer['cwp'] == df_tracer['file_name'].str[0:25]]
     df_tracer = pd.merge(

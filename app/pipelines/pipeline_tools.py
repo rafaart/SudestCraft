@@ -1,3 +1,4 @@
+"""Módulo que contém funções padronizadas utilizadas em todos os Pipelines, como atribuição de Status e quebra de modelos"""
 import pandas as pd
 
 def breakdown_by_axis(df, groupby, axis, n_parts):

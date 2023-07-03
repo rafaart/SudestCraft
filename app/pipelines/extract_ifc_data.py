@@ -1,3 +1,6 @@
+"""Pipeline desenvolvido para extração e mapeamento de modelos IFC. O mapeamento é feito por fornecedor, devendo 
+todos o modelos do mesmo possuirem campos padronizados. Utilizar o módulo de config para adicionar ou modificar
+o mapeamento"""
 import os
 import ifcopenshell
 import ifcopenshell.geom

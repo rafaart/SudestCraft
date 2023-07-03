@@ -1,3 +1,4 @@
+"""Pipeline desenvolvido para o BI de Montagem Eletromecanica."""
 import os
 import pandas as pd
 from pipelines import pipeline_tools
@@ -6,6 +7,7 @@ from data_sources.LX import LX
 from data_sources.foundation import Summary
 from data_sources.materials import Reports
 from data_sources.masterplan import ListaMaster, Masterplan
+from datetime import datetime
 
 
 def newsteel():
@@ -174,5 +176,85 @@ def capanema():
     )
     df_cwp['supplier'] = df_cwp['supplier'].fillna(df_cwp['fornecedor'])
     df_cwp.loc[df_cwp['peso_un_desenho'].isna(), 'peso_un_desenho'] = df_cwp['peso_un_recebimento']
-
     df_cwp.to_parquet(os.path.join(output_dir, 'cwp_data.parquet'), index=False)
+
+
+def _get_view(df_view, output_path):
+    now = datetime.datetime.now()
+    df_view['data_inicio_fornecedor'] = df_view['data_inicio_fornecedor'].dt.date
+    df_view['data_termino_fornecedor'] = df_view['data_termino_fornecedor'].dt.date
+    df_view['data_inicio_masterplan'] = df_view['data_inicio_masterplan'].dt.date
+    df_view.insert(13, 'prontidao', df_view['data_inicio_masterplan'] - pd.Timedelta(days=30))
+    df_view.insert(3, 'peso_lx', df_view['qtd_lx'] * df_view['peso_un_lx'] / 1000)
+    df_view.insert(4, 'peso_desenho', df_view['qtd_desenho'] * df_view['peso_un_desenho'] / 1000)
+    df_view.insert(5, 'peso_recebido', df_view['qtd_recebida'] * df_view['peso_un'] / 1000)
+    
+    df_view_cwp = df_view[[
+        'cwp',
+        'supplier',
+        'peso_lx',
+        'peso_desenho',
+        'peso_recebido',
+        'peso_capex_ton_memoria_fornecedor',
+        'data_inicio_fornecedor',
+        'data_termino_fornecedor',
+        'prontidao',
+        'data_inicio_masterplan',
+    ]]
+    df_view_cwp = pd.merge(
+        df_view_cwp.groupby(['cwp', 'supplier'], as_index=False).sum(),
+        df_view_cwp[[
+            'cwp', 
+            'supplier', 
+            'data_inicio_fornecedor', 
+            'data_termino_fornecedor', 
+            'prontidao', 
+            'data_inicio_masterplan',
+        ]].drop_duplicates(subset=['cwp', 'supplier']),
+        on=['cwp', 'supplier']
+    )
+    df_view_cwp = df_view_cwp.rename(columns={
+        'cwp': 'CWP',
+        'supplier': 'Fornecedor',
+        'peso_lx': 'Peso LX (t)',
+        'peso_desenho': 'Peso Materials (t)',
+        'peso_recebido': 'Recebido (t)',
+        'peso_capex_ton_memoria_fornecedor': 'Peso PQ (t)',
+        'data_inicio_fornecedor': 'Start Tendência',
+        'data_termino_fornecedor': 'Finish Tendência',
+        'prontidao': 'Prontidão',
+        'data_inicio_masterplan': 'Inicio de Montagem',
+    })
+
+    df_view_tag = df_view[[
+        'cwp',
+        'cod_ativo',
+        'tag',
+        'supplier',
+        'peso_lx',
+        'peso_desenho',
+        'peso_recebido',
+        'qtd_desenho',
+        'qtd_recebida',
+        'descricao_desenho',
+    ]].dropna(subset=['tag'])
+    
+    df_view_tag = df_view_tag.rename(columns={
+        'cwp': 'CWP',
+        'cod_ativo': 'Cod Ativo',
+        'tag': 'TAG',
+        'supplier': 'Fornecedor',
+        'peso_lx': 'Peso LX (t)',
+        'peso_desenho': 'Peso Materials (t)',
+        'qtd_desenho': 'Qtd. Materials',
+        'peso_recebido': 'Recebido (t)',
+        'qtd_recebida': 'Qtd. Recebimento',
+        'descricao_desenho': 'Descrição Materials',
+    })
+
+    writer = pd.ExcelWriter(output_path, engine = 'xlsxwriter')
+    df_view_tag.to_excel(writer, sheet_name = 'Dados por Tag', index=False, startrow=1)
+    df_view_cwp.to_excel(writer, sheet_name = 'Dados por CWP', index=False)
+    worksheet = writer.sheets['Dados por Tag']
+    worksheet.write(0, 0, f'Atualizado em {str(now.date())} {str(now.time().hour)}:{str(now.time().minute)}')
+    writer.close()
