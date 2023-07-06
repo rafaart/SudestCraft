@@ -163,27 +163,3 @@ class Reports():
         self.df_recebimento = pd.concat([self.df_recebimento, other_report.df_recebimento])
         self.df_desenho = pd.concat([self.df_desenho, other_report.df_desenho])
         return self
-
-    @staticmethod
-    def _get_quantities(df, df_warehouse):   
-        df['qtd_recebida'] = 0
-        df_proxy = df.loc[df['tag'].isin(df_warehouse['tag'])].copy()
-        for idx, row in df_proxy.iterrows():
-            qtd_recebida = df_warehouse.loc[df_warehouse['tag'] == row['tag'], 'qtd_recebida']
-            qtd_faltante = row['qtd_desenho'] - row['qtd_recebida']
-            if qtd_faltante > 0 and not qtd_recebida.empty:
-                qtd_recebida = qtd_recebida.iloc[0]
-                if qtd_recebida >= qtd_faltante:
-                    df.loc[idx, 'qtd_recebida'] = qtd_faltante
-                    df_warehouse.loc[df_warehouse['tag'] == row['tag'], 'qtd_recebida'] = qtd_recebida - qtd_faltante
-                else:
-                    df.loc[idx, 'qtd_recebida'] = qtd_recebida
-                    df_warehouse.loc[df_warehouse['tag'] == row['tag'], 'qtd_recebida'] = 0
-
-        df_warehouse = df_warehouse.loc[df_warehouse['qtd_recebida'] > 0, ['tag', 'qtd_recebida', 'peso_un_recebimento']]
-        df_warehouse['cwp'] = 'CWP NÃO ENCONTRADO'
-        df = pd.concat([
-            df,
-            df_warehouse
-        ])
-        return df

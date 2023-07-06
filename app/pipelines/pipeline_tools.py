@@ -204,9 +204,11 @@ def _predict_stock(df, df_warehouse):
     df['qtd_solicitada_alocada'] = 0
     df['qtd_entregue_alocada'] = 0
     for idx, row in df.iterrows():
+        row = row.fillna(0)
         qtd_disponivel = df_warehouse.loc[df_warehouse['tag'] == row['tag'], ['qtd_solicitada', 'qtd_entregue']]
-        qtd_solicitada_faltante = row['qtd_desenho'] - row['qtd_solicitada']
-        qtd_entregue_faltante = row['qtd_desenho'] - row['qtd_entregue']
+        qtd_necessaria = row['qtd_desenho'] if row['qtd_desenho'] else row['qtd_lx']
+        qtd_solicitada_faltante = qtd_necessaria - row['qtd_solicitada']
+        qtd_entregue_faltante = qtd_necessaria - row['qtd_entregue']
 
         if qtd_solicitada_faltante > 0:
             if not qtd_disponivel['qtd_solicitada'].empty:
@@ -229,3 +231,28 @@ def _predict_stock(df, df_warehouse):
                     df_warehouse.loc[df_warehouse['tag'] == row['tag'], 'qtd_entregue'] = 0
     return df
 
+
+def _get_quantities(df, df_warehouse):   
+    df['qtd_recebida'] = 0
+    df_proxy = df.loc[df['tag'].isin(df_warehouse['tag'])].copy()
+    for idx, row in df_proxy.iterrows():
+        row = row.fillna(0)
+        qtd_recebida = df_warehouse.loc[df_warehouse['tag'] == row['tag'], 'qtd_recebida']
+        qtd_necessaria = row['qtd_desenho'] if row['qtd_desenho'] else row['qtd_lx']
+        qtd_faltante = qtd_necessaria - row['qtd_recebida']
+        if qtd_faltante > 0 and not qtd_recebida.empty:
+            qtd_recebida = qtd_recebida.iloc[0]
+            if qtd_recebida >= qtd_faltante:
+                df.loc[idx, 'qtd_recebida'] = qtd_faltante
+                df_warehouse.loc[df_warehouse['tag'] == row['tag'], 'qtd_recebida'] = qtd_recebida - qtd_faltante
+            else:
+                df.loc[idx, 'qtd_recebida'] = qtd_recebida
+                df_warehouse.loc[df_warehouse['tag'] == row['tag'], 'qtd_recebida'] = 0
+
+    df_warehouse = df_warehouse.loc[df_warehouse['qtd_recebida'] > 0, ['tag', 'qtd_recebida', 'peso_un_recebimento']]
+    df_warehouse['cwp'] = 'CWP NÃO ENCONTRADO'
+    df = pd.concat([
+        df,
+        df_warehouse
+    ])
+    return df

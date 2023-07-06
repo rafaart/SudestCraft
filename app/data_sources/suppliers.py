@@ -343,7 +343,7 @@ class ProducaoEMALTO():
     def __init__(self, source_dir) -> None:
         for item in os.listdir(source_dir):
             if os.path.isfile(os.path.join(source_dir, item)):
-                if 'relatório de acompanhamento' in item.lower():
+                if 'acompanhamento de projeto' in item.lower():
                     self.df_raw = pd.read_excel(
                         os.path.join(source_dir, item),
                         skiprows=1,

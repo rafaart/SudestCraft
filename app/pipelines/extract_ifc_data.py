@@ -77,7 +77,7 @@ def codeme(use_files=None):
     output_folder = os.environ['STAGGING_PATH_CAPANEMA']
 
     print('Number of workers: ', num_workers)
-    lx_capanema_dir = SuppliersLX(os.environ['LX_PATH_CAPANEMA'], os.environ['MAPPER_PATH_CAPANEMA'])
+    lx_capanema_dir = LX(os.environ['LX_PATH_CAPANEMA'], os.environ['MAPPER_PATH_CAPANEMA'])
     df_lx = lx_capanema_dir.get_report()
     df_lx = df_lx.loc[df_lx['supplier'] == 'CODEME']
     
@@ -123,7 +123,7 @@ def sinosteel(use_files=None):
     output_folder = os.environ['STAGGING_PATH_CAPANEMA']
 
     print('Number of workers: ', num_workers)
-    lx_capanema_dir = SuppliersLX(os.environ['LX_PATH_CAPANEMA'], os.environ['MAPPER_PATH_CAPANEMA'])
+    lx_capanema_dir = LX(os.environ['LX_PATH_CAPANEMA'], os.environ['MAPPER_PATH_CAPANEMA'])
     df_lx = lx_capanema_dir.get_report()
     df_lx = df_lx.loc[df_lx['supplier'] == 'SINOSTEEL']
     df_lx = df_lx[['cwp', 'supplier']].drop_duplicates(subset='cwp', keep='first')

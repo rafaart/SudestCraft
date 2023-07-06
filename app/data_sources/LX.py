@@ -52,7 +52,7 @@ class LX():
 
     def _read_files(self):
         worksheets = []
-        df_errors = pd.DataFrame(columns=['file', 'sheet'])
+        df_errors = pd.DataFrame(columns=['file_path', 'sheet'])
         for file_path in self.mapped_files:
             try:
                 mod_date = os.path.getmtime(file_path)
@@ -94,10 +94,10 @@ class LX():
                             worksheet['cod_vale'] = header['cod_vale'] 
                             worksheets.append(worksheet)
                         except:
-                            row = pd.DataFrame({'file': [os.path.basename(file_path)], 'sheet': [sheet]})
+                            row = pd.DataFrame({'file_path': [file_path], 'sheet': [sheet]})
                             df_errors = pd.concat([df_errors, row], axis=0, ignore_index=True)        
             except Exception as e:
-                row = pd.DataFrame({'file': [os.path.basename(file_path)], 'sheet': None})
+                row = pd.DataFrame({'file_path': [file_path], 'sheet': None})
                 df_errors = pd.concat([df_errors, row], axis=0, ignore_index=True)                
         self.df_raw = pd.concat(worksheets, axis=0, ignore_index=True)
         self.df_errors = df_errors
@@ -123,6 +123,7 @@ class LX():
         df['chave'] = df['cwp_number'].str.zfill(3) + '-' + df['tag']
         df.loc[df['peso_un_lx'].str.contains(',', na=False, regex=False), 'peso_un_lx'] = df['peso_un_lx'].str.replace('.', '').str.replace(',', '.')
         df['peso_un_lx'] = df['peso_un_lx'].apply(lambda x: 0 if '-' in str(x) else float(x))
+        pd.set_option('display.max_colwidth', None)
         df['qtd_lx'] = df['qtd_lx'].astype(float)
 
         keys = ['cwp', 'cod_ativo', 'tag'] if self.grouped_by_building else ['cwp', 'tag']

@@ -1,14 +1,17 @@
 """Pipeline desenvolvido para o BI de Gestão de Materiais"""
+
 import pandas as pd
 import data_sources.foundation
 import data_sources.suppliers
 import os
 import datetime
+from pipelines import pipeline_tools
 from data_sources import suppliers
 from data_sources.LX import LX
 from data_sources.materials import Reports
 from data_sources.masterplan import Masterplan
-
+from pathlib import Path
+from ext.converters import convert_xls_to_xlsx
 def newsteel():
     output_dir = os.environ['OUTPUT_GESTAO_MATERIAIS_NEWSTEEL']
 
@@ -29,7 +32,9 @@ def newsteel():
     lx._run_pipeline()
     df_lx = lx.df_lx
     df_error = lx.df_errors
+    print("Os seguintes arquivos não puderam ser lidos de forma correta:\n")
     print(df_error)
+    df_error.to_excel(os.path.join(output_dir, 'erros_found.xlsx'), index=False)
     df_suppliers = pd.concat([df_aumond, df_fam_mining, df_fam_structure])
     df_suppliers = df_suppliers.sort_values(by='data_termino', ascending=True).drop_duplicates(subset='cwp' ,keep='last')
 
@@ -61,7 +66,7 @@ def newsteel():
         how='outer',
         suffixes=('_lx', '_desenho')
     )  
-    df_main = Reports._get_quantities(df_main, reports.df_recebimento)
+    df_main = pipeline_tools._get_quantities(df_main, reports.df_recebimento)
     df_main = pd.merge(
         df_main,
         reports.df_recebimento[['tag', 'peso_un_recebimento', 'fornecedor']],
