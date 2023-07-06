@@ -153,7 +153,7 @@ def capanema():
         how='outer',
         suffixes=(None, '_desenho')
     )
-    df_main = Reports._get_quantities(df_main.sort_values(by='data_inicio_masterplan', ascending=True), reports.df_recebimento)
+    df_main = pipeline_tools._get_quantities(df_main.sort_values(by='data_inicio_masterplan', ascending=True), reports.df_recebimento)
     df_main = pd.merge(
         df_main,
         reports.df_recebimento[['tag', 'peso_un_recebimento', 'fornecedor']],
@@ -180,7 +180,6 @@ def capanema():
         on='cwp',
         how='left',
     )
-
     #############FILTERS
     # df_main = df_main.loc[df_main['cwp'].str.contains('-S1985-', na=False) | df_main['cwp'].str.contains('CWP NÃO ENCONTRADO', na=False)]
     df_main = df_main.loc[~df_main['cwp'].str.contains('-M-SD-', na=False)]

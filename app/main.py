@@ -21,14 +21,14 @@ if __name__ == "__main__":
     # lx_check.newsteel()
 
     # montagem_eletromecanica.newsteel()
-    gestao_materiais.newsteel()
+    # gestao_materiais.newsteel()
     # bim_x_pwp.emalto()
     # bim_x_pwp.famsteel()
     # federated_model.newsteel()
 
     # montagem_eletromecanica.capanema()
-    # gestao_materiais.capanema()
-    # bim_x_pwp.codeme()
-    # bim_x_pwp.sinosteel()
-    # federated_model.capanema()  
+    gestao_materiais.capanema()
+    bim_x_pwp.codeme()
+    bim_x_pwp.sinosteel()
+    # federated_model.capanema()  14
     # federated_model.vcad()        
