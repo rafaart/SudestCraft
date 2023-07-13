@@ -5,7 +5,7 @@ class Masterplan:
     def __init__(self, source_dir) -> None:
         for item in os.listdir(source_dir):
             if os.path.isfile(os.path.join(source_dir, item)):
-                if 'master plan' in item.lower():
+                if 'dd' in item.lower():
                     self.df_raw = pd.read_excel(
                         os.path.join(source_dir, item),
                         usecols=['Activity ID', 'BL Start', 'BL Finish', 'Start', 'Finish']
@@ -37,7 +37,7 @@ class MasterplanDD:
     def __init__(self, source_dir) -> None:
         for item in os.listdir(source_dir):
             if os.path.isfile(os.path.join(source_dir, item)):
-                if 'master plan' in item.lower():
+                if 'dd' in item.lower():
                     worksheets = []
                     workbook = pd.ExcelFile(os.path.join(source_dir, item))
                     for sheet in workbook.sheet_names:

@@ -35,6 +35,7 @@ def newsteel():
     print("Os seguintes arquivos não puderam ser lidos de forma correta:\n")
     print(df_error)
     df_error.to_excel(os.path.join(output_dir, 'erros_found.xlsx'), index=False)
+    print(df_lx.loc[df_lx.supplier.str.contains("DELTADUCON")])
     df_suppliers = pd.concat([df_aumond, df_fam_mining, df_fam_structure])
     df_suppliers = df_suppliers.sort_values(by='data_termino', ascending=True).drop_duplicates(subset='cwp' ,keep='last')
 
@@ -56,9 +57,10 @@ def newsteel():
         left=df_main,
         right=df_lx[['cwp', 'tag', 'supplier', 'qtd_lx', 'peso_un_lx']],
         on='cwp',
-        how='left',
+        how='outer',
         suffixes=(None, '_lx')
     )
+    print(df_main.loc[df_main.supplier.str.contains("DELTADUCON", na=False), ["cwp", "tag", "qtd_lx"]])
     df_main = pd.merge(
         left=df_main,
         right=reports.df_desenho,
@@ -87,7 +89,7 @@ def capanema():
 
     memoria_calculo = suppliers.MemoriaCalculo(os.environ['MEMORIA_CALCULO_PATH_CAPANEMA'])
     lx = LX(os.environ['LX_PATH_CAPANEMA'])
-    lx_sinosteel = LX(r'C:\Users\EmmanuelSantana\VERUM PARTNERS\VERUM PARTNERS - VAL2018021\00.TI\Proj - Capanema\SMAT\LX\SINOSTEEL\LX_GERAL_SINOSTEEL')
+    lx_sinosteel = LX(r'C:\Users\RafaelSouza\VERUM PARTNERS\VERUM PARTNERS - VAL2018021\00.TI\Proj - Capanema\SMAT\LX\SINOSTEEL\LX_GERAL_SINOSTEEL')
     masterplan = Masterplan(os.environ['MASTERPLAN_PATH_CAPANEMA'])
     reports = Reports(source_dir=os.environ['REPORTS_PATH_CAPANEMA'])
     reports.clean_reports()

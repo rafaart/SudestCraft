@@ -75,6 +75,7 @@ def emalto():
 
     cronograma_construcap = CronogramaMasterConstrucap(os.environ['MONTADORA_PATH_NEWSTEEL'])
     producao = ProducaoEMALTO(os.environ['PRODUCAO_PATH_NEWSTEEL'])
+    
     romaneio = RomaneioEMALTO(os.environ['ROMANEIO_PATH_NEWSTEEL'])
     tracer = TracerFullReport(os.environ['TRACER_PATH_NEWSTEEL'])
     reports = Reports(os.environ['REPORTS_PATH_NEWSTEEL'])
@@ -232,7 +233,7 @@ def sinosteel():
 
     masterplan = Masterplan(os.environ['MASTERPLAN_PATH_CAPANEMA'])
     lx = LX(os.environ['LX_PATH_CAPANEMA'])
-    lx_sinosteel = LX(r'C:\Users\EmmanuelSantana\VERUM PARTNERS\VERUM PARTNERS - VAL2018021\00.TI\Proj - Capanema\SMAT\LX\SINOSTEEL\LX_GERAL_SINOSTEEL')
+    lx_sinosteel = LX(r'C:\Users\RafaelSouza\VERUM PARTNERS\VERUM PARTNERS - VAL2018021\00.TI\Proj - Capanema\SMAT\LX\SINOSTEEL\LX_GERAL_SINOSTEEL')
     tracer = TracerFullReport(os.environ['TRACER_PATH_CAPANEMA'])
     reports = Reports(os.environ['REPORTS_PATH_CAPANEMA'])
     reports.clean_reports()

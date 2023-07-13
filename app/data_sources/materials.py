@@ -19,6 +19,7 @@ class Reports():
                         sep=';', 
                         index_col=False,
                         header=0,
+                        na_values=['  #VALUE! ', '  #DIV/0! '],
                         usecols=[' TAG/CÓDIGO ', ' QT RECEBIDA ', ' FORNECEDOR ', ' ATTR_VALUE']
                     )
                 if 'desenho.csv' in item.lower():

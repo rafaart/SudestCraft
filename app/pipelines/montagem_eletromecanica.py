@@ -112,7 +112,7 @@ def capanema():
     masterplan = Masterplan(os.environ['MASTERPLAN_PATH_CAPANEMA'])
     lista_master = ListaMaster(os.environ['MASTERPLAN_PATH_CAPANEMA'])
     lx = LX(os.environ['LX_PATH_CAPANEMA'])
-    lx_sinosteel = LX(r'C:\Users\EmmanuelSantana\VERUM PARTNERS\VERUM PARTNERS - VAL2018021\00.TI\Proj - Capanema\SMAT\LX\SINOSTEEL\LX_GERAL_SINOSTEEL')
+    lx_sinosteel = LX(r"C:\Users\RafaelSouza\VERUM PARTNERS\VERUM PARTNERS - VAL2018021\00.TI\Proj - Capanema\SMAT\LX\SINOSTEEL\LX_GERAL_SINOSTEEL")
     reports = Reports(source_dir=os.environ['REPORTS_PATH_CAPANEMA'])
     reports.clean_reports()
 
@@ -206,7 +206,7 @@ def capanema():
     df_unknow_cwp = df_distribuicao.loc[~df_distribuicao[['cwp', 'tag']].apply(tuple,1).isin(df_cwp[['cwp', 'tag']].apply(tuple,1)), ['cwp', 'tag', 'qtd_solicitada', 'qtd_entregue']]
     df_unknow_cwp = df_unknow_cwp.groupby(by=['tag'], as_index=False).sum(numeric_only=True)
     df_cwp = pipeline_tools._predict_stock(df_cwp, df_unknow_cwp)
-    df_cwp = Reports._get_quantities(df_cwp.sort_values(by='data_inicio', ascending=True), df_recebimento)
+    df_cwp = pipeline_tools._get_quantities(df_cwp.sort_values(by='data_inicio', ascending=True), df_recebimento)
     df_cwp = pd.merge(
         df_cwp,
         df_recebimento[['tag', 'peso_un_recebimento', 'fornecedor']],
