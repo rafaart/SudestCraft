@@ -4,6 +4,7 @@ from datetime import datetime
 
 
 
+
 class LX():
     def __init__(self, source_dir, grouped_by_building=False) -> None:
         self.source_dir = source_dir
@@ -52,7 +53,7 @@ class LX():
 
     def _read_files(self):
         worksheets = []
-        df_errors = pd.DataFrame(columns=['file_path', 'sheet'])
+        df_errors = pd.DataFrame(columns=['file_path', 'sheet', 'error'])
         for file_path in self.mapped_files:
             try:
                 mod_date = os.path.getmtime(file_path)
@@ -94,13 +95,14 @@ class LX():
                             worksheet['cod_vale'] = header['cod_vale'] 
                             worksheets.append(worksheet)
                         except:
-                            row = pd.DataFrame({'file_path': [file_path], 'sheet': [sheet]})
+                            row = pd.DataFrame({'file_path': [file_path], 'sheet': [sheet], 'error': 'processing'})
                             df_errors = pd.concat([df_errors, row], axis=0, ignore_index=True)        
             except Exception as e:
-                row = pd.DataFrame({'file_path': [file_path], 'sheet': None})
+                row = pd.DataFrame({'file_path': [file_path], 'sheet': None, 'error': 'reading'})
                 df_errors = pd.concat([df_errors, row], axis=0, ignore_index=True)                
         self.df_raw = pd.concat(worksheets, axis=0, ignore_index=True)
         self.df_errors = df_errors
+        
 
     def _clean_raw(self):
         df = self.df_raw

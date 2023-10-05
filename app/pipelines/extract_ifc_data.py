@@ -14,7 +14,7 @@ import json
 
 
 config = Ifc.config
-num_workers = mp.cpu_count()  
+num_workers = int(mp.cpu_count()/4 )
 
 
 def _get_colors(geometry_settings, element):
@@ -99,7 +99,7 @@ def codeme(use_files=None):
         df_elements['file_name'] = os.path.basename(file_name).replace('.db', '')
         df_elements['supplier'] = 'CODEME'
         df_elements['config'] = json.dumps(config['CODEME'])
-        data_chunks = np.array_split(df_elements[['IfcId', 'config']], num_workers / 2)
+        data_chunks = np.array_split(df_elements[['IfcId', 'config']], num_workers)
 
         with mp.Pool(processes=num_workers) as pool:
             pool_results = [pool.apply_async(_process_data_chunk, args=(ifc_file_path, chunk)) for chunk in data_chunks]
@@ -123,11 +123,17 @@ def sinosteel(use_files=None):
     output_folder = os.environ['STAGGING_PATH_CAPANEMA']
 
     print('Number of workers: ', num_workers)
-    lx_capanema_dir = LX(os.environ['LX_PATH_CAPANEMA'], os.environ['MAPPER_PATH_CAPANEMA'])
-    df_lx = lx_capanema_dir.get_report()
-    df_lx = df_lx.loc[df_lx['supplier'] == 'SINOSTEEL']
+
+    lx_sinosteel = LX(r'C:\Users\RafaelSouza\VERUM PARTNERS\VERUM PARTNERS - VAL2018021\00.TI\Proj - Capanema\SMAT\LX\SINOSTEEL\LX_GERAL_SINOSTEEL')
+    lx_sinosteel.config['depth'] = 0
+    lx_sinosteel._run_pipeline()
+    df_lx_sinosteel = lx_sinosteel.df_lx  
+    df_lx_sinosteel['supplier'] = 'SINOSTEEL'
+    df_lx = df_lx_sinosteel
     df_lx = df_lx[['cwp', 'supplier']].drop_duplicates(subset='cwp', keep='first')
     files_names = os.listdir(input_db_folder)
+    
+
     if use_files:
         files_names = use_files if isinstance(use_files, list) else [use_files]
 
@@ -144,7 +150,7 @@ def sinosteel(use_files=None):
         df_elements['file_name'] = os.path.basename(file_name).replace('.db', '')
         df_elements['supplier'] = 'SINOSTEEL'
         df_elements['config'] = json.dumps(config['SINOSTEEL'])
-        data_chunks = np.array_split(df_elements[['IfcId', 'config']], num_workers / 2)
+        data_chunks = np.array_split(df_elements[['IfcId', 'config']], num_workers)
 
         with mp.Pool(processes=num_workers) as pool:
             pool_results = [pool.apply_async(_process_data_chunk, args=(ifc_file_path, chunk)) for chunk in data_chunks]
@@ -184,7 +190,7 @@ def emalto(use_files=None):
         df_elements['file_name'] = os.path.basename(file_name).replace('.db', '').replace('_EMALTO', '') 
         df_elements['supplier'] = 'EMALTO'
         df_elements['config'] = json.dumps(config['EMALTO'])
-        data_chunks = np.array_split(df_elements[['IfcId', 'config']], num_workers / 2)
+        data_chunks = np.array_split(df_elements[['IfcId', 'config']], num_workers)
 
         with mp.Pool(processes=num_workers) as pool:
             pool_results = [pool.apply_async(_process_data_chunk, args=(ifc_file_path, chunk)) for chunk in data_chunks]
@@ -225,7 +231,7 @@ def famsteel(use_files=None):
         df_elements['file_name'] = os.path.basename(file_name).replace('.db', '').replace('_EMALTO', '') 
         df_elements['supplier'] = 'FAM'
         df_elements['config'] = json.dumps(config['FAM'])
-        data_chunks = np.array_split(df_elements[['IfcId', 'config']], num_workers / 2)
+        data_chunks = np.array_split(df_elements[['IfcId', 'config']], num_workers)
 
         with mp.Pool(processes=num_workers) as pool:
             pool_results = [pool.apply_async(_process_data_chunk, args=(ifc_file_path, chunk)) for chunk in data_chunks]

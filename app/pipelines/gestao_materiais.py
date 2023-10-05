@@ -46,6 +46,9 @@ def newsteel():
         how='left',
         suffixes=('_construcap', '_fornecedor')
     )
+
+    print(df_construcap.columns)
+    
     df_main = pd.merge(
         left=df_main,
         right=df_pq,
@@ -76,9 +79,12 @@ def newsteel():
         how='left',
         suffixes=(None, '_recebimento')
     )
-    df_main.loc[df_main['peso_un_recebimento'].isna(), 'peso_un'] = df_main['peso_un_desenho']
-    df_main.loc[df_main['peso_un'].isna(), 'peso_un'] = df_main['peso_un_recebimento']
     df_main['supplier'] = df_main['supplier'].fillna(df_main['fornecedor'])
+    
+
+    # df_main.loc[df_main['peso_un_recebimento'].isna(), 'peso_un'] = df_main['peso_un_desenho']
+    # df_main.loc[df_main['peso_un'].isna(), 'peso_un'] = df_main['peso_un_recebimento'] 
+
     df_main.to_parquet(os.path.join(output_dir, 'report_data.parquet'), index=False)
     _get_view_newsteel(df_main, os.path.join(output_dir, 'view_gestao_de_materiais.xlsx'))    
 
@@ -119,10 +125,14 @@ def capanema():
     df_lx_sinosteel = lx_sinosteel.df_lx   
     df_lx_sinosteel['supplier'] = 'SINOSTEEL'
     lx._run_pipeline()
+    df_error = lx.df_errors
+    print(df_error)
 
     df_lx = lx.df_lx
     df_lx = df_lx.loc[df_lx['supplier'] != 'SINOSTEEL']
+    # verificação se o material existe ou não
     df_lx = pd.concat([df_lx, df_lx_sinosteel])
+    print(df_lx.loc[df_lx['tag'].str.contains("1360CF-00211A", na=False), ['cwp', 'tag', 'qtd_lx']])
     memoria_calculo._clean_report()
     df_memoria = memoria_calculo.report
     df_demontagem = memoria_calculo.cwp_desmontagem
@@ -163,9 +173,8 @@ def capanema():
         how='left',
         suffixes=(None, '_recebimento')
     )
-    df_main.loc[df_main['peso_un_recebimento'].isna(), 'peso_un'] = df_main['peso_un_desenho']
-    df_main.loc[df_main['peso_un'].isna(), 'peso_un'] = df_main['peso_un_recebimento']
     df_main['supplier'] = df_main['supplier'].fillna(df_main['fornecedor'])
+
     df_main = pd.merge(
         left=df_main,
         right=df_memoria[['cwp', 'fornecedor', 'peso_capex_ton']].rename(columns={'fornecedor':'supplier'}).groupby(['cwp','supplier'], as_index=False).sum(),
@@ -174,6 +183,7 @@ def capanema():
         suffixes=(None, '_memoria_fornecedor')
     )
     df_main = df_main.loc[~df_main['cwp'].isin(df_demontagem['cwp'])]
+
     df_missing_supplier = df_main.loc[df_main['supplier'].isna() & ~df_main['peso_capex_ton'].isna(), ['cwp']].drop_duplicates(keep='first')
     df_missing_supplier['supplier_flag'] = False
     df_main = pd.merge(
@@ -191,23 +201,34 @@ def capanema():
     
     df_main.to_parquet(os.path.join(output_dir, 'report_data.parquet'), index=False)
     df_memoria.to_parquet(os.path.join(output_dir, 'memoria_calculo.parquet'), index=False)
+    print(df_main.columns)
     _get_view(df_main, os.path.join(output_dir, 'view_gestao_de_materiais.xlsx'))    
 
 
 def _get_view(df_view, output_path):
     now = datetime.datetime.now()
+    df_view['peso_un_agregado'] = df_view['peso_un_lx'].fillna(df_view['peso_un_desenho']).fillna(df_view['peso_un_recebimento'])
+    df_view['peso_un_agregado'] = df_view['peso_un_agregado']/1000
+    df_view['peso_total_materials'] = df_view['qtd_desenho'] * df_view['peso_un_agregado']
     df_view.insert(13, 'prontidao', df_view['data_inicio_masterplan'] - pd.Timedelta(days=30))
-    df_view.insert(3, 'peso_lx', df_view['qtd_lx'] * df_view['peso_un_lx'] / 1000)
-    df_view.insert(4, 'peso_desenho', df_view['qtd_desenho'] * df_view['peso_un_desenho'] / 1000)
-    df_view.insert(5, 'peso_recebido', df_view['qtd_recebida'] * df_view['peso_un'] / 1000)
+    df_view.insert(3, 'peso_lx', df_view['qtd_lx'] * df_view['peso_un_agregado'] )
+    df_view.insert(4, 'peso_desenho', df_view['qtd_desenho'] * df_view['peso_un_agregado'])
+    df_view.insert(5, 'peso_recebido', df_view['qtd_recebida'] * df_view['peso_un_agregado'] )
     
+
+
     df_view_cwp = df_view[[
         'cwp',
         'supplier',
-        'peso_lx',
+        'peso_un_lx',
         'peso_desenho',
         'peso_recebido',
+        'peso_un_agregado',
         'peso_capex_ton_memoria_fornecedor',
+        'qtd_lx',
+        'peso_lx',
+        'peso_total_materials',
+        'peso_recebido',
         'data_inicio_fornecedor',
         'data_termino_fornecedor',
         'prontidao',
@@ -225,17 +246,24 @@ def _get_view(df_view, output_path):
         ]].drop_duplicates(subset=['cwp', 'supplier']),
         on=['cwp', 'supplier']
     )
+
+
     df_view_cwp = df_view_cwp.rename(columns={
         'cwp': 'CWP',
         'supplier': 'Fornecedor',
-        'peso_lx': 'Peso LX (t)',
-        'peso_desenho': 'Peso Materials (t)',
+        'peso_un_lx': 'Peso Unitário LX (t)',
+        'peso_un_agregado': 'Peso unitário Agregado (t)',
         'peso_recebido': 'Recebido (t)',
         'peso_capex_ton_memoria_fornecedor': 'Peso PQ (t)',
+        'qtd_lx': 'Quantidade LX',
+        'peso_lx': 'Peso total LX (t)',
+        'peso_total_materials': 'Peso total Materials (t)',
+        'peso_recebido': 'Peso Total Recebido',
         'data_inicio_fornecedor': 'Start Tendência',
         'data_termino_fornecedor': 'Finish Tendência',
         'prontidao': 'Prontidão',
         'data_inicio_masterplan': 'Inicio de Montagem',
+        'peso_un_agregado': 'Peso Unitário Agregado',
     })
 
     df_view_tag = df_view[[
@@ -244,6 +272,7 @@ def _get_view(df_view, output_path):
         'tag',
         'supplier',
         'peso_lx',
+        'peso_un_agregado',
         'peso_desenho',
         'peso_recebido',
         'qtd_desenho',
@@ -257,6 +286,7 @@ def _get_view(df_view, output_path):
         'tag': 'TAG',
         'supplier': 'Fornecedor',
         'peso_lx': 'Peso LX (t)',
+        'peso_un_agregado': 'Peso Unitário Agregado(t)',
         'peso_desenho': 'Peso Materials (t)',
         'qtd_desenho': 'Qtd. Materials',
         'peso_recebido': 'Recebido (t)',
@@ -274,22 +304,34 @@ def _get_view(df_view, output_path):
 
 def _get_view_newsteel(df_view, output_path):
     now = datetime.datetime.now()
+    df_view['peso_un_agregado'] = df_view['peso_un_lx'].fillna(df_view['peso_un_desenho']).fillna(df_view['peso_un_recebimento'])
+    df_view['peso_un_agregado'] = df_view['peso_un_agregado']/1000
+    df_view['peso_total_materials'] = df_view['qtd_desenho'] * df_view['peso_un_agregado']
     df_view.insert(13, 'prontidao', df_view['data_inicio_construcap'] - pd.Timedelta(days=30))
-    df_view.insert(3, 'peso_lx', df_view['qtd_lx'] * df_view['peso_un_lx'] / 1000)
-    df_view.insert(4, 'peso_desenho', df_view['qtd_desenho'] * df_view['peso_un_desenho'] / 1000)
-    df_view.insert(5, 'peso_recebido', df_view['qtd_recebida'] * df_view['peso_un'] / 1000)
+    df_view.insert(3, 'peso_lx', df_view['qtd_lx'] * df_view['peso_un_agregado'])
+    df_view.insert(4, 'peso_desenho', df_view['qtd_desenho'] * df_view['peso_un_agregado'])
+    df_view.insert(5, 'peso_recebido', df_view['qtd_recebida'] * df_view['peso_un_agregado'])
     
+
+
     df_view_cwp = df_view[[
         'cwp',
         'supplier',
-        'peso_lx',
+        'peso_un_lx',
         'peso_desenho',
+        'peso_recebido',
+        'peso_un_agregado',
+        'peso_total_kg',
+        'qtd_lx',
+        'peso_lx',
+        'peso_total_materials',
         'peso_recebido',
         'data_inicio_fornecedor',
         'data_termino_fornecedor',
         'prontidao',
         'data_inicio_construcap',
     ]]
+    
     df_view_cwp = pd.merge(
         df_view_cwp.groupby(['cwp', 'supplier'], as_index=False).sum(),
         df_view_cwp[[
@@ -304,13 +346,14 @@ def _get_view_newsteel(df_view, output_path):
     )
     df_view_cwp = df_view_cwp.rename(columns={
         'cwp': 'CWP',
+        'cod_ativo': 'Cod Ativo',
+        'tag': 'TAG',
         'supplier': 'Fornecedor',
         'peso_lx': 'Peso LX (t)',
         'peso_desenho': 'Peso Materials (t)',
+        'qtd_desenho': 'Qtd. Materials',
         'peso_recebido': 'Recebido (t)',
-        'data_inicio_fornecedor': 'Start Tendência',
-        'data_termino_fornecedor': 'Finish Tendência',
-        'prontidao': 'Prontidão',
+        'qtd_recebida': 'Qtd. Recebimento',
         'data_inicio_construcap': 'Inicio de Montagem',
     })
 
@@ -319,6 +362,7 @@ def _get_view_newsteel(df_view, output_path):
         'tag',
         'supplier',
         'peso_lx',
+        'peso_un_agregado',
         'peso_desenho',
         'peso_recebido',
         'qtd_desenho',
@@ -331,6 +375,7 @@ def _get_view_newsteel(df_view, output_path):
         'tag': 'TAG',
         'supplier': 'Fornecedor',
         'peso_lx': 'Peso LX (t)',
+        'peso_un_agregado': 'Peso Unitário Agregado(t)',
         'peso_desenho': 'Peso Materials (t)',
         'qtd_desenho': 'Qtd. Materials',
         'peso_recebido': 'Recebido (t)',
@@ -344,3 +389,5 @@ def _get_view_newsteel(df_view, output_path):
     worksheet = writer.sheets['Dados por Tag']
     worksheet.write(0, 0, f'Atualizado em {str(now.date())} {str(now.time().hour)}:{str(now.time().minute)}')
     writer.close()
+
+

@@ -156,6 +156,7 @@ def apply_status_sinosteel(row):
         status = '5.Não será detalhado'
     elif (row['color_r'] > row['color_g']) and (row['color_r'] > row['color_b']):
         status = '4.Aguardando detalhamento'
+    
     elif not (qtd_materials >= 0 or qtd_lx >= 0):
         status = '3.Não consta em LX'
     elif order <= qtd_recebida:
@@ -166,7 +167,33 @@ def apply_status_sinosteel(row):
         status = 'Erro de regra'
     return status
 
+def apply_status_distribuicao_sinosteel(row):
+    row = row.fillna({'qtd_recebida': 0})
+    qtd_recebida = row['qtd_recebida']
+    qtd_materials = row['qtd_desenho']
+    qtd_entregue_total = row['qtd_entregue_total']
+    qtd_solicitada_total = row['qtd_solicitada_total']
+    qtd_lx = row['qtd_lx']
+    order = row['order']
 
+    
+    # elif (row['color_r'] > row['color_g']) and (row['color_r'] > row['color_b']) and (row['supplier']=="SINOSTEEL"):
+        # status = '7.Aguardando detalhamento'
+    if (row['color_b'] > row['color_g']) and (row['color_b'] > row['color_r']) and (row['supplier']=="SINOSTEEL") and (not(qtd_lx > 0)):
+        status = '7.Não será detalhado'
+    elif  not(qtd_lx > 0):
+        status = '5.Não consta em LX'
+    elif (qtd_entregue_total >= order):
+        status = '4.Entregue à Montadora'
+    elif qtd_entregue_total < order <= qtd_solicitada_total :
+        status = '3.Solicitado pela Montadora'
+    elif qtd_solicitada_total < order <= qtd_recebida :
+        status = '1.Recebido'
+    elif qtd_lx >= order > qtd_recebida:
+        status = '2.Não Recebido'    
+    else:
+        status = '6.Marca inconsistente'
+    return status
 
 
 
@@ -178,7 +205,7 @@ def get_quantities_montagem_eletromecanica(df, df_warehouse, by):
             df[qtd_column] = 0
     for idx, row in df.iterrows():
         qtd_distribuida = df_warehouse.loc[(df_warehouse[by[0]] == row[by[0]]) & (df_warehouse[by[1]] == row[by[1]]), ['qtd_solicitada', 'qtd_entregue']]
-        qtd_faltante = row['qtd_desenho']
+        qtd_faltante = row['qtd_lx']
         if qtd_faltante > 0:
             if not qtd_distribuida.empty:
                 qtd_solicitada = qtd_distribuida['qtd_solicitada'].iloc[0]
@@ -238,7 +265,7 @@ def _get_quantities(df, df_warehouse):
     for idx, row in df_proxy.iterrows():
         row = row.fillna(0)
         qtd_recebida = df_warehouse.loc[df_warehouse['tag'] == row['tag'], 'qtd_recebida']
-        qtd_necessaria = row['qtd_desenho'] if row['qtd_desenho'] else row['qtd_lx']
+        qtd_necessaria = row['qtd_lx'] if row['qtd_lx'] else row['qtd_desenho']
         qtd_faltante = qtd_necessaria - row['qtd_recebida']
         if qtd_faltante > 0 and not qtd_recebida.empty:
             qtd_recebida = qtd_recebida.iloc[0]
@@ -249,7 +276,7 @@ def _get_quantities(df, df_warehouse):
                 df.loc[idx, 'qtd_recebida'] = qtd_recebida
                 df_warehouse.loc[df_warehouse['tag'] == row['tag'], 'qtd_recebida'] = 0
 
-    df_warehouse = df_warehouse.loc[df_warehouse['qtd_recebida'] > 0, ['tag', 'qtd_recebida', 'peso_un_recebimento']]
+    df_warehouse = df_warehouse.loc[df_warehouse['qtd_recebida'] > 0, ['tag', 'qtd_recebida']]
     df_warehouse['cwp'] = 'CWP NÃO ENCONTRADO'
     df = pd.concat([
         df,

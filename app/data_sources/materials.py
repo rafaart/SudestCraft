@@ -8,7 +8,7 @@ class Reports():
         'CF-S1985',
         'VG-P0400',
     ]
-    def __init__(self, source_dir=r'C:\Users\EmmanuelSantana\VERUM PARTNERS\VERUM PARTNERS - VAL2018021\00.TI\Proj - Capanema\BI\Arquivo\Report') -> None:
+    def __init__(self, source_dir) -> None:
         for item in os.listdir(source_dir):
             if os.path.isfile(os.path.join(source_dir, item)):
                 file_path = os.path.join(source_dir, item)

@@ -111,6 +111,45 @@ class CronogramaMasterConstrucap:
             how='outer'
         )
         return df
+    
+# class CronogramaMasterConstrucap:
+#     def __init__(self, source_dir) -> None:
+#         for item in os.listdir(source_dir):
+#             if os.path.isfile(os.path.join(source_dir, item)):
+#                 if 'construcap' in item.lower():
+#                     self.df_workbook = pd.read_excel(
+#                         os.path.join(source_dir, item),
+#                         usecols=['Item', 'P0400: cwa_id', "P0400: CWP's / EWP's / PWP's_Work_Type", 'Activity Name', 'Start', 'Finish']
+#                     )
+#                     break
+    
+#     def get_report(self):
+#         return self.__class__._clean_report(self.df_workbook)
+
+#     @staticmethod
+#     def _clean_report(df):
+#         df = df.rename(columns={
+#             'Item': 'item',
+#             'P0400: cwa_id': 'cwa',
+#             "P0400: CWP's / EWP's / PWP's_Work_Type": 'cwp',
+#             'Activity Name': 'descricao',
+#             'Start': 'data_inicio',
+#             'Finish': 'data_termino'
+#         })
+#         df = df.loc[df['item'].str.count('.') > 2]
+#         df = df.dropna(subset=['cwp'])
+#         df.loc[df['cwp'].str.contains('-CWPp'), 'atividade'] = 'pre-montagem'
+#         df.loc[df['cwp'].str.contains('-CWPm'), 'atividade'] = 'montagem'
+#         df['cwp'] = df['cwp'].str.split('-CWP').str[0] + '-CWP'
+#         df_min = df.loc[df.groupby('cwp', sort=False)['data_inicio'].idxmin()].drop(columns=['data_termino'])
+#         df_max = df.loc[df.groupby('cwp', sort=False)['data_termino'].idxmax(), ['cwp', 'data_termino']]
+#         df = pd.merge(
+#             left=df_min,
+#             right=df_max,
+#             on='cwp',
+#             how='outer'
+#         )
+#         return df
 
 
 
